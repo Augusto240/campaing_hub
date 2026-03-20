@@ -8,6 +8,7 @@ import {
   campaignIdParamsSchema,
   createSessionSchema,
   sessionIdParamsSchema,
+  updateSessionLogSchema,
   updateSessionSchema,
 } from './session.validation';
 
@@ -33,7 +34,7 @@ export const getSessions = asyncHandler(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     const { campaignId } = validate(campaignIdParamsSchema, req.params);
 
-    const sessions = await sessionService.getSessionsByCampaign(campaignId);
+    const sessions = await sessionService.getSessionsByCampaign(campaignId, req.user!.id);
 
     res.json(success(sessions, 'Sessions retrieved successfully'));
   }
@@ -43,7 +44,7 @@ export const getSessionById = asyncHandler(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     const { sessionId } = validate(sessionIdParamsSchema, req.params);
 
-    const session = await sessionService.getSessionById(sessionId);
+    const session = await sessionService.getSessionById(sessionId, req.user!.id);
 
     res.json(success(session, 'Session retrieved successfully'));
   }
@@ -78,10 +79,29 @@ export const generateSessionReport = asyncHandler(
   async (req: AuthRequest, res: Response, _next: NextFunction) => {
     const { sessionId } = validate(sessionIdParamsSchema, req.params);
 
-    const pdfBuffer = await sessionService.generateReport(sessionId);
+    const pdfBuffer = await sessionService.generateReport(sessionId, req.user!.id);
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="session-${sessionId}-report.pdf"`);
     res.send(pdfBuffer);
+  }
+);
+
+/**
+ * PATCH /api/sessions/:sessionId/log
+ * Atualiza log narrativo da sessao (somente GM).
+ */
+export const updateSessionLog = asyncHandler(
+  async (req: AuthRequest, res: Response, _next: NextFunction) => {
+    const { sessionId } = validate(sessionIdParamsSchema, req.params);
+    const { narrativeLog, privateGmNotes, highlights } = validate(updateSessionLogSchema, req.body);
+
+    const sessionLog = await sessionService.updateSessionLog(sessionId, {
+      narrativeLog,
+      privateGmNotes,
+      highlights,
+    });
+
+    res.json(success(sessionLog, 'Session log updated successfully'));
   }
 );

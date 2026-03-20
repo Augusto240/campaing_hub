@@ -1,81 +1,97 @@
 import { prisma } from '../../config/database';
 
+const DASHBOARD_CACHE_TTL_MS = 60_000;
+const dashboardCache = new Map<string, { data: unknown; expiresAt: number }>();
+
+const withCache = async <T>(
+  key: string,
+  ttlMs: number,
+  resolver: () => Promise<T>
+): Promise<T> => {
+  const cached = dashboardCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data as T;
+  }
+
+  const data = await resolver();
+  dashboardCache.set(key, {
+    data,
+    expiresAt: Date.now() + ttlMs,
+  });
+  return data;
+};
+
 export class DashboardService {
   async getDashboardStats(userId: string) {
-    // Get campaigns where user is owner or member
-    const campaigns = await prisma.campaign.findMany({
-      where: {
-        OR: [{ ownerId: userId }, { members: { some: { userId } } }],
-      },
-      include: {
-        sessions: {
-          select: {
-            xpAwarded: true,
-            date: true,
+    return withCache(`dashboard:${userId}`, DASHBOARD_CACHE_TTL_MS, async () => {
+      const campaigns = await prisma.campaign.findMany({
+        where: {
+          OR: [{ ownerId: userId }, { members: { some: { userId } } }],
+        },
+        include: {
+          sessions: {
+            select: {
+              xpAwarded: true,
+              date: true,
+            },
+          },
+          characters: {
+            select: {
+              level: true,
+              xp: true,
+            },
           },
         },
-        characters: {
-          select: {
-            level: true,
-            xp: true,
-          },
-        },
-      },
+      });
+
+      const totalCampaigns = campaigns.length;
+      const totalSessions = campaigns.reduce((sum, c) => sum + c.sessions.length, 0);
+      const totalCharacters = campaigns.reduce((sum, c) => sum + c.characters.length, 0);
+      const totalXPAwarded = campaigns.reduce(
+        (sum, c) => sum + c.sessions.reduce((s, session) => s + session.xpAwarded, 0),
+        0
+      );
+
+      const avgXPPerCampaign = totalCampaigns > 0 ? totalXPAwarded / totalCampaigns : 0;
+
+      const systemStats: { [key: string]: number } = {};
+      campaigns.forEach((campaign) => {
+        systemStats[campaign.system] = (systemStats[campaign.system] || 0) + 1;
+      });
+
+      const mostPlayedSystem =
+        Object.entries(systemStats).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
+
+      const allSessions = campaigns.flatMap((c) => c.sessions);
+      const xpOverTime = this.aggregateXPOverTime(allSessions);
+      const sessionsPerMonth = this.getSessionsPerMonth(allSessions);
+
+      const recentActivity = await prisma.activityLog.findMany({
+        where: { userId },
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const allCharacters = campaigns.flatMap((c) => c.characters);
+      const levelDistribution = this.getLevelDistribution(allCharacters);
+
+      return {
+        totalCampaigns,
+        totalSessions,
+        totalCharacters,
+        totalXPAwarded,
+        avgXPPerCampaign: Math.round(avgXPPerCampaign),
+        mostPlayedSystem,
+        systemDistribution: Object.entries(systemStats).map(([system, count]) => ({
+          system,
+          count,
+        })),
+        xpOverTime,
+        sessionsPerMonth,
+        recentActivity,
+        levelDistribution,
+      };
     });
-
-    const totalCampaigns = campaigns.length;
-    const totalSessions = campaigns.reduce((sum, c) => sum + c.sessions.length, 0);
-    const totalCharacters = campaigns.reduce((sum, c) => sum + c.characters.length, 0);
-    const totalXPAwarded = campaigns.reduce(
-      (sum, c) => sum + c.sessions.reduce((s, session) => s + session.xpAwarded, 0),
-      0
-    );
-
-    const avgXPPerCampaign = totalCampaigns > 0 ? totalXPAwarded / totalCampaigns : 0;
-
-    // System distribution
-    const systemStats: { [key: string]: number } = {};
-    campaigns.forEach((campaign) => {
-      systemStats[campaign.system] = (systemStats[campaign.system] || 0) + 1;
-    });
-
-    const mostPlayedSystem =
-      Object.entries(systemStats).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
-
-    // XP over time (all campaigns)
-    const allSessions = campaigns.flatMap((c) => c.sessions);
-    const xpOverTime = this.aggregateXPOverTime(allSessions);
-
-    // Sessions per month
-    const sessionsPerMonth = this.getSessionsPerMonth(allSessions);
-
-    // Recent activity
-    const recentActivity = await prisma.activityLog.findMany({
-      where: { userId },
-      take: 10,
-      orderBy: { createdAt: 'desc' },
-    });
-
-    // Character level distribution
-    const allCharacters = campaigns.flatMap((c) => c.characters);
-    const levelDistribution = this.getLevelDistribution(allCharacters);
-
-    return {
-      totalCampaigns,
-      totalSessions,
-      totalCharacters,
-      totalXPAwarded,
-      avgXPPerCampaign: Math.round(avgXPPerCampaign),
-      mostPlayedSystem,
-      systemDistribution: Object.entries(systemStats).map(([system, count]) => ({
-        system,
-        count,
-      })),
-      xpOverTime,
-      sessionsPerMonth,
-      recentActivity,
-      levelDistribution,
-    };
   }
 
   private aggregateXPOverTime(sessions: { date: Date; xpAwarded: number }[]) {

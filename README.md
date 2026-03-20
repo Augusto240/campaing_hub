@@ -1,4 +1,4 @@
-<p align="center">
+﻿<p align="center">
   <img src="https://img.shields.io/badge/⚔️_Campaign_Hub-RPG_Management-c9a84c?style=for-the-badge&labelColor=0f0f1a" alt="Campaign Hub" />
 </p>
 
@@ -50,11 +50,15 @@ Três anos depois, evoluiu para uma **plataforma completa e moderna** com autent
 - **Autenticação** — Registro, login com JWT (access + refresh tokens), proteção de rotas
 - **Dashboard** — Estatísticas do jogador, atividade recente, campanhas ativas
 - **Campanhas (CRUD)** — Criar, editar, excluir campanhas com suporte a múltiplos sistemas (D&D 5e, Tormenta 20, Call of Cthulhu, Pathfinder)
-- **Personagens (CRUD)** — Gerenciar personagens vinculados a campanhas, com classe, nível, XP e ficha
-- **Sessões (CRUD)** — Registrar sessões de jogo com data, resumo e XP concedido
+- **Personagens (CRUD)** — Gerenciar personagens vinculados a campanhas, com atributos/recursos flexíveis por sistema
+- **Sessões (CRUD)** — Registrar sessões de jogo com data, resumo, XP e log narrativo (público + notas GM)
 - **Espólios (CRUD)** — Controlar itens e tesouros obtidos, com atribuição a personagens
 - **Notificações** — Sistema de notificações em tempo real
 - **Permissões** — Controle GM vs Player por campanha (somente GM cria sessões, espólios, etc.)
+- **Engine Multi-Sistema** — Templates de regras para D&D 5e, PF2e, CoC 7e e Tormenta20
+- **Wiki de Campanha** — Páginas markdown com categorias, tags e visibilidade pública/GM
+- **Histórico Persistido de Rolagens** — Fórmulas com `kh/kl`, `advantage/disadvantage` e modificador por atributo
+- **Sanidade e Mana** — Fluxos específicos para CoC (sanity check) e Tormenta20 (spell cast + fé)
 
 ---
 
@@ -102,7 +106,7 @@ campaign-hub/
 ├── backend/
 │   ├── Dockerfile                # Build multi-stage Node.js
 │   ├── prisma/
-│   │   └── schema.prisma         # Modelos do banco (10 tabelas)
+│   │   └── schema.prisma         # Modelos do banco (fase multi-sistema)
 │   └── src/
 │       ├── server.ts             # Entry point Express
 │       ├── config/               # Database + Upload configs
@@ -114,7 +118,10 @@ campaign-hub/
 │       │   ├── sessions/         # CRUD de sessões
 │       │   ├── loot/             # CRUD de espólios
 │       │   ├── dashboard/        # Stats e atividade
-│       │   └── notifications/    # Sistema de notificações
+│       │   ├── notifications/    # Sistema de notificações
+│       │   ├── rpg-systems/      # Catálogo de sistemas de RPG
+│       │   ├── dice/             # Rolagens persistidas
+│       │   └── wiki/             # Wiki da campanha
 │       └── utils/                # Error handler, XP calculator
 │
 └── frontend/
@@ -164,6 +171,13 @@ Users ──────┬──── Campaigns ────┬──── Ch
 | `characters` | Personagens (nome, classe, nível, XP, ficha) |
 | `sessions` | Sessões de jogo (data, resumo, XP concedido) |
 | `loot` | Espólios / itens (nome, descrição, valor, atribuído a personagem) |
+| `rpg_systems` | Templates de regras por sistema (schema de atributos, flags de sanidade/mana etc.) |
+| `items` | Catálogo de itens enriquecido (raridade, tipo, valor, propriedades) |
+| `loot_items` | Relação N:N entre loot e itens |
+| `wiki_pages` | Wiki markdown da campanha com categorias e tags |
+| `dice_rolls` | Histórico persistido de rolagens |
+| `sanity_events` | Eventos de sanidade por personagem (CoC) |
+| `spell_casts` | Conjurações com custo de mana/fé (Tormenta20) |
 | `events` | Eventos de campanha (Battle, Story, NPC, Treasure) |
 | `notifications` | Notificações de usuário |
 | `activity_logs` | Log de atividade do sistema |
@@ -246,50 +260,78 @@ ng serve                   # Inicia na porta 4200
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | `POST` | `/api/auth/register` | Registrar novo usuário |
-| `POST` | `/api/auth/login` | Login (retorna access + refresh tokens) |
-| `POST` | `/api/auth/refresh` | Renovar access token |
+| `POST` | `/api/auth/login` | Login (access + refresh token) |
+| `POST` | `/api/auth/refresh` | Rotacionar refresh token e renovar sessão |
+| `POST` | `/api/auth/logout` | Revogar refresh token |
+| `GET` | `/api/auth/profile` | Perfil do usuário autenticado |
 
 ### Campanhas
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | `GET` | `/api/campaigns` | Listar campanhas do usuário |
 | `POST` | `/api/campaigns` | Criar campanha |
-| `GET` | `/api/campaigns/:id` | Detalhes da campanha |
-| `PUT` | `/api/campaigns/:id` | Atualizar campanha (GM) |
-| `DELETE` | `/api/campaigns/:id` | Deletar campanha (GM) |
-| `POST` | `/api/campaigns/:id/join` | Entrar em campanha |
+| `GET` | `/api/campaigns/:campaignId` | Detalhes da campanha |
+| `PUT` | `/api/campaigns/:campaignId` | Atualizar campanha (owner/GM) |
+| `DELETE` | `/api/campaigns/:campaignId` | Deletar campanha (owner) |
+| `POST` | `/api/campaigns/:campaignId/members` | Adicionar membro |
+| `DELETE` | `/api/campaigns/:campaignId/members/:userId` | Remover membro |
+| `GET` | `/api/campaigns/:campaignId/stats` | Estatísticas da campanha |
+| `GET` | `/api/campaigns/:campaignId/export` | Exportar campanha em CSV |
 
 ### Personagens
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| `GET` | `/api/campaigns/:id/characters` | Listar personagens da campanha |
-| `POST` | `/api/campaigns/:id/characters` | Criar personagem |
-| `PUT` | `/api/characters/:id` | Atualizar personagem |
-| `DELETE` | `/api/characters/:id` | Deletar personagem |
+| `POST` | `/api/characters` | Criar personagem |
+| `GET` | `/api/characters/campaign/:campaignId` | Listar personagens da campanha |
+| `GET` | `/api/characters/:characterId` | Detalhes do personagem |
+| `PUT` | `/api/characters/:characterId` | Atualizar personagem (owner/GM) |
+| `DELETE` | `/api/characters/:characterId` | Deletar personagem (owner/GM) |
+| `POST` | `/api/characters/:characterId/sheet` | Upload de ficha |
+| `PATCH` | `/api/characters/:characterId/resources` | Atualizar recursos (hp/mana/sanity etc.) |
+| `POST` | `/api/characters/:characterId/sanity-check` | Executar sanity check (sistemas com sanidade) |
+| `GET` | `/api/characters/:characterId/sanity-events` | Histórico de eventos de sanidade |
+| `POST` | `/api/characters/:characterId/spell-cast` | Registrar conjuração (sistemas com mana) |
+| `GET` | `/api/characters/:characterId/spell-casts` | Histórico de conjurações |
 
 ### Sessões
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| `GET` | `/api/campaigns/:id/sessions` | Listar sessões |
-| `POST` | `/api/campaigns/:id/sessions` | Criar sessão (GM) |
-| `PUT` | `/api/sessions/:id` | Atualizar sessão (GM) |
-| `DELETE` | `/api/sessions/:id` | Deletar sessão (GM) |
+| `POST` | `/api/sessions` | Criar sessão (GM) |
+| `GET` | `/api/sessions/campaign/:campaignId` | Listar sessões da campanha |
+| `GET` | `/api/sessions/:sessionId` | Detalhes da sessão |
+| `PUT` | `/api/sessions/:sessionId` | Atualizar sessão (GM) |
+| `PATCH` | `/api/sessions/:sessionId/log` | Atualizar log narrativo da sessão (GM) |
+| `DELETE` | `/api/sessions/:sessionId` | Deletar sessão (GM) |
+| `GET` | `/api/sessions/:sessionId/report` | Gerar relatório PDF |
 
-### Espólios (Loot)
+### Loot
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| `GET` | `/api/sessions/:id/loot` | Listar espólios da sessão |
-| `POST` | `/api/sessions/:id/loot` | Criar espólio (GM) |
-| `PUT` | `/api/loot/:id` | Atualizar espólio (GM) |
-| `DELETE` | `/api/loot/:id` | Deletar espólio (GM) |
+| `POST` | `/api/loot` | Criar loot (GM) |
+| `GET` | `/api/loot/session/:sessionId` | Listar loot da sessão |
+| `PUT` | `/api/loot/:lootId` | Atualizar loot (GM) |
+| `DELETE` | `/api/loot/:lootId` | Deletar loot (GM) |
+| `POST` | `/api/loot/:lootId/assign` | Atribuir loot a personagem (GM) |
 
-### Dashboard & Notificações
+### Dashboard e Notificações
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| `GET` | `/api/dashboard/stats` | Estatísticas do jogador |
-| `GET` | `/api/dashboard/activity` | Atividade recente |
-| `GET` | `/api/notifications` | Listar notificações |
-| `PUT` | `/api/notifications/:id/read` | Marcar como lida |
+| `GET` | `/api/dashboard/stats` | Estatísticas do usuário |
+| `GET` | `/api/notifications` | Listar notificações do usuário |
+| `PUT` | `/api/notifications/:notificationId/read` | Marcar notificação como lida |
+| `PUT` | `/api/notifications/read-all` | Marcar todas como lidas |
+
+### RPG Systems, Dice e Wiki
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `/api/rpg-systems` | Listar sistemas suportados |
+| `POST` | `/api/dice/roll` | Executar rolagem persistida |
+| `GET` | `/api/dice/campaign/:campaignId` | Histórico de rolagens por campanha |
+| `GET` | `/api/wiki/campaign/:campaignId` | Listar páginas da wiki |
+| `GET` | `/api/wiki/:wikiPageId` | Obter página da wiki |
+| `POST` | `/api/wiki` | Criar página da wiki |
+| `PUT` | `/api/wiki/:wikiPageId` | Atualizar página da wiki |
+| `DELETE` | `/api/wiki/:wikiPageId` | Remover página da wiki |
 
 ---
 
@@ -365,10 +407,13 @@ docker compose exec postgres psql -U campaign_user -d campaign_hub
 | Variável | Descrição | Padrão |
 |----------|-----------|--------|
 | `DATABASE_URL` | Connection string PostgreSQL | `postgresql://campaign_user:campaign_pass@postgres:5432/campaign_hub` |
-| `JWT_SECRET` | Chave secreta para JWT | **Obrigatória** (sem valor padrão) |
-| `JWT_REFRESH_SECRET` | Chave para refresh tokens | **Obrigatória** (sem valor padrão) |
+| `JWT_SECRET` | Chave do access token (mínimo 32 caracteres) | **Obrigatória** |
+| `JWT_REFRESH_SECRET` | Chave do refresh token (mínimo 32 caracteres) | **Obrigatória** |
+| `JWT_EXPIRES_IN` | Expiração do access token | `15m` |
+| `JWT_REFRESH_EXPIRES_IN` | Expiração do refresh token | `7d` |
 | `PORT` | Porta do servidor | `3000` |
 | `NODE_ENV` | Ambiente de execução | `production` |
+| `CORS_ORIGIN` | Origem permitida no CORS | `http://localhost` |
 
 ### Docker Compose
 
@@ -377,6 +422,14 @@ docker compose exec postgres psql -U campaign_user -d campaign_hub
 | `POSTGRES_USER` | Usuário do PostgreSQL | `campaign_user` |
 | `POSTGRES_PASSWORD` | Senha do PostgreSQL | `campaign_pass` |
 | `POSTGRES_DB` | Nome do banco | `campaign_hub` |
+
+### Migrations
+
+- Use `npx prisma migrate deploy` para ambientes novos.
+- Ordem atual de migrations:
+- `20260320110000_initial_schema`
+- `20260320120000_security_hardening`
+- `20260320143000_phase3_multisystem`
 
 ---
 

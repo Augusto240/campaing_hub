@@ -90,30 +90,68 @@ export class LootService {
   }
 
   async assignLoot(lootId: string, characterId: string | null) {
-    const loot = await prisma.loot.update({
-      where: { id: lootId },
-      data: {
-        assignedToCharacterId: characterId,
-      },
-      include: {
-        assignedToCharacter: {
-          include: {
-            player: true,
+    return prisma.$transaction(async (tx) => {
+      const existingLoot = await tx.loot.findUnique({
+        where: { id: lootId },
+        include: {
+          session: {
+            select: {
+              campaignId: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    // Notify the player if assigned
-    if (characterId && loot.assignedToCharacter) {
-      await prisma.notification.create({
+      if (!existingLoot) {
+        throw new AppError(404, 'Loot not found');
+      }
+
+      if (characterId) {
+        const character = await tx.character.findUnique({
+          where: { id: characterId },
+          select: {
+            campaignId: true,
+          },
+        });
+
+        if (!character) {
+          throw new AppError(404, 'Character not found');
+        }
+
+        if (character.campaignId !== existingLoot.session.campaignId) {
+          throw new AppError(
+            400,
+            'Character must belong to the same campaign as the loot',
+            true,
+            'INVALID_RELATION'
+          );
+        }
+      }
+
+      const loot = await tx.loot.update({
+        where: { id: lootId },
         data: {
-          userId: loot.assignedToCharacter.player.id,
-          message: `Loot "${loot.name}" has been assigned to your character "${loot.assignedToCharacter.name}"`,
+          assignedToCharacterId: characterId,
+        },
+        include: {
+          assignedToCharacter: {
+            include: {
+              player: true,
+            },
+          },
         },
       });
-    }
 
-    return loot;
+      if (characterId && loot.assignedToCharacter) {
+        await tx.notification.create({
+          data: {
+            userId: loot.assignedToCharacter.player.id,
+            message: `Loot "${loot.name}" has been assigned to your character "${loot.assignedToCharacter.name}"`,
+          },
+        });
+      }
+
+      return loot;
+    });
   }
 }

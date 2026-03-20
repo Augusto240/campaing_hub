@@ -24,6 +24,44 @@ enum EventType {
   TREASURE
 }
 
+enum Rarity {
+  MUNDANE
+  COMMON
+  UNCOMMON
+  RARE
+  VERY_RARE
+  LEGENDARY
+  ARTIFACT
+  ELDRITCH
+}
+
+enum ItemType {
+  WEAPON
+  ARMOR
+  POTION
+  SCROLL
+  WAND
+  RING
+  MISC
+  MAGIC_ITEM
+  CONSUMABLE
+  TOME
+  MYTHOS_TOME
+  RELIC
+}
+
+enum WikiCategory {
+  NPC
+  LOCATION
+  FACTION
+  LORE
+  HOUSE_RULE
+  BESTIARY
+  DEITY
+  MYTHOS
+  SESSION_RECAP
+}
+
 model User {
   id           String   @id @default(uuid())
   name         String
@@ -34,13 +72,15 @@ model User {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   // Relations
-  ownedCampaigns    Campaign[]
-  campaignMembers   CampaignMember[]
-  characters        Character[]
-  notifications     Notification[]
-  activityLogs      ActivityLog[]
-  createdSessions   Session[]
-  refreshTokens     RefreshToken[]
+  ownedCampaigns  Campaign[]
+  campaignMembers CampaignMember[]
+  characters      Character[]
+  notifications   Notification[]
+  activityLogs    ActivityLog[]
+  createdSessions Session[]
+  refreshTokens   RefreshToken[]
+  wikiPages       WikiPage[]       @relation("WikiPageAuthor")
+  diceRolls       DiceRoll[]
 
   @@map("users")
 }
@@ -59,21 +99,46 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+model RpgSystem {
+  id              String   @id @default(uuid())
+  name            String   @unique
+  slug            String   @unique
+  description     String?
+  diceFormula     String   @map("dice_formula")
+  attributeSchema Json     @map("attribute_schema")
+  xpTable         Json?    @map("xp_table")
+  hasSpellSlots   Boolean  @default(false) @map("has_spell_slots")
+  hasSanity       Boolean  @default(false) @map("has_sanity")
+  hasMana         Boolean  @default(false) @map("has_mana")
+  hasHeroPoints   Boolean  @default(false) @map("has_hero_points")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  campaigns  Campaign[]
+  characters Character[]
+  items      Item[]
+
+  @@map("rpg_systems")
+}
+
 model Campaign {
   id          String   @id @default(uuid())
   name        String
   description String?
-  system      String   // DND5E, T20, CoC, etc
+  system      String
+  systemId    String?  @map("system_id")
   ownerId     String   @map("owner_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  owner       User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  members     CampaignMember[]
-  characters  Character[]
-  sessions    Session[]
-  events      Event[]
+  owner          User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  systemTemplate RpgSystem?       @relation(fields: [systemId], references: [id], onDelete: SetNull)
+  members        CampaignMember[]
+  characters     Character[]
+  sessions       Session[]
+  events         Event[]
+  wikiPages      WikiPage[]
+  diceRolls      DiceRoll[]
 
   @@map("campaigns")
 }
@@ -94,40 +159,56 @@ model CampaignMember {
 }
 
 model Character {
-  id            String   @id @default(uuid())
-  name          String
-  class         String
-  level         Int      @default(1)
-  xp            Int      @default(0)
-  version       Int      @default(0)
-  playerId      String   @map("player_id")
-  campaignId    String   @map("campaign_id")
-  sheetFileUrl  String?  @map("sheet_file_url")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  name         String
+  class        String
+  level        Int      @default(1)
+  xp           Int      @default(0)
+  version      Int      @default(0)
+  playerId     String   @map("player_id")
+  campaignId   String   @map("campaign_id")
+  systemId     String?  @map("system_id")
+  attributes   Json     @default("{}")
+  resources    Json     @default("{}")
+  inventory    Json     @default("[]")
+  notes        String?
+  imageUrl     String?  @map("image_url")
+  sheetFileUrl String?  @map("sheet_file_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   // Relations
-  player   User      @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  campaign Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  loot     Loot[]
+  player         User          @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  campaign       Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  systemTemplate RpgSystem?    @relation(fields: [systemId], references: [id], onDelete: SetNull)
+  loot           Loot[]
+  sanityEvents   SanityEvent[]
+  spellCasts     SpellCast[]
+  diceRolls      DiceRoll[]
 
   @@map("characters")
 }
 
 model Session {
-  id         String   @id @default(uuid())
-  campaignId String   @map("campaign_id")
-  date       DateTime
-  summary    String?
-  xpAwarded  Int      @default(0) @map("xp_awarded")
-  createdBy  String   @map("created_by")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(uuid())
+  campaignId     String   @map("campaign_id")
+  date           DateTime
+  summary        String?
+  narrativeLog   String?  @map("narrative_log")
+  privateGmNotes String?  @map("private_gm_notes")
+  highlights     String[] @default([])
+  xpAwarded      Int      @default(0) @map("xp_awarded")
+  createdBy      String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   // Relations
-  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  creator  User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
-  loot     Loot[]
+  campaign     Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creator      User          @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  loot         Loot[]
+  diceRolls    DiceRoll[]
+  sanityEvents SanityEvent[]
+  spellCasts   SpellCast[]
 
   @@map("sessions")
 }
@@ -142,10 +223,43 @@ model Loot {
   createdAt             DateTime @default(now()) @map("created_at")
 
   // Relations
-  session           Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session             Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   assignedToCharacter Character? @relation(fields: [assignedToCharacterId], references: [id], onDelete: SetNull)
+  lootItems           LootItem[]
 
   @@map("loot")
+}
+
+model Item {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  rarity      Rarity   @default(COMMON)
+  weight      Float?
+  value       Int?
+  itemType    ItemType @default(MISC) @map("item_type")
+  systemId    String?  @map("system_id")
+  properties  Json?
+  imageUrl    String?  @map("image_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  systemTemplate RpgSystem? @relation(fields: [systemId], references: [id], onDelete: SetNull)
+  lootItems      LootItem[]
+
+  @@map("items")
+}
+
+model LootItem {
+  id       String @id @default(uuid())
+  lootId   String @map("loot_id")
+  itemId   String @map("item_id")
+  quantity Int    @default(1)
+
+  loot Loot @relation(fields: [lootId], references: [id], onDelete: Cascade)
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([lootId, itemId])
+  @@map("loot_items")
 }
 
 model Event {
@@ -164,11 +278,12 @@ model Event {
 }
 
 model Notification {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
   message   String
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now()) @map("created_at")
+  read      Boolean   @default(false)
+  expiresAt DateTime? @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -188,4 +303,79 @@ model ActivityLog {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("activity_logs")
+}
+
+model WikiPage {
+  id         String       @id @default(uuid())
+  campaignId String       @map("campaign_id")
+  title      String
+  content    String
+  category   WikiCategory
+  tags       String[]     @default([])
+  createdBy  String       @map("created_by")
+  isPublic   Boolean      @default(true) @map("is_public")
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  author   User     @relation("WikiPageAuthor", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, category])
+  @@map("wiki_pages")
+}
+
+model DiceRoll {
+  id          String   @id @default(uuid())
+  sessionId   String?  @map("session_id")
+  campaignId  String   @map("campaign_id")
+  userId      String   @map("user_id")
+  characterId String?  @map("character_id")
+  formula     String
+  result      Int
+  breakdown   Json
+  label       String?
+  isPrivate   Boolean  @default(false) @map("is_private")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  session   Session?   @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  campaign  Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
+
+  @@index([campaignId, createdAt])
+  @@map("dice_rolls")
+}
+
+model SanityEvent {
+  id           String   @id @default(uuid())
+  characterId  String   @map("character_id")
+  sessionId    String?  @map("session_id")
+  trigger      String
+  sanityLost   Int      @map("sanity_lost")
+  tempInsanity String?  @map("temp_insanity")
+  permInsanity String?  @map("perm_insanity")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  session   Session?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([characterId, createdAt])
+  @@map("sanity_events")
+}
+
+model SpellCast {
+  id          String   @id @default(uuid())
+  characterId String   @map("character_id")
+  sessionId   String?  @map("session_id")
+  spellName   String   @map("spell_name")
+  manaCost    Int      @map("mana_cost")
+  faithCost   Int      @default(0) @map("faith_cost")
+  result      String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  session   Session?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([characterId, createdAt])
+  @@map("spell_casts")
 }

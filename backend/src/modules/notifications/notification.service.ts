@@ -1,5 +1,35 @@
+import cron from 'node-cron';
 import { prisma } from '../../config/database';
 import { AppError } from '../../utils/error-handler';
+
+const NOTIFICATION_RETENTION_DAYS = 30;
+let cleanupSchedulerStarted = false;
+
+export const startNotificationCleanup = () => {
+  if (cleanupSchedulerStarted) {
+    return;
+  }
+
+  cleanupSchedulerStarted = true;
+  cron.schedule('0 3 * * *', async () => {
+    try {
+      const cutoffDate = new Date(
+        Date.now() - NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000
+      );
+
+      await prisma.notification.deleteMany({
+        where: {
+          read: true,
+          createdAt: {
+            lt: cutoffDate,
+          },
+        },
+      });
+    } catch (error) {
+      console.error('[notification-cleanup] Failed to cleanup notifications', error);
+    }
+  });
+};
 
 export class NotificationService {
   async getUserNotifications(userId: string) {

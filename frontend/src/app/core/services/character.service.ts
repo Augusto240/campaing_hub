@@ -25,6 +25,45 @@ export class CharacterService {
     return this.http.put<any>(`${this.API_URL}/${id}`, data);
   }
 
+  updateResources(id: string, resources: Record<string, string | number | boolean>): Observable<any> {
+    return this.http.patch<any>(`${this.API_URL}/${id}/resources`, { resources });
+  }
+
+  sanityCheck(
+    id: string,
+    data: {
+      roll: number;
+      difficulty: number;
+      trigger: string;
+      sessionId?: string;
+      successLoss?: number;
+      failedLoss?: number;
+    }
+  ): Observable<any> {
+    return this.http.post<any>(`${this.API_URL}/${id}/sanity-check`, data);
+  }
+
+  getSanityEvents(id: string): Observable<any> {
+    return this.http.get<any>(`${this.API_URL}/${id}/sanity-events`);
+  }
+
+  castSpell(
+    id: string,
+    data: {
+      spellName: string;
+      manaCost: number;
+      faithCost?: number;
+      result?: string;
+      sessionId?: string;
+    }
+  ): Observable<any> {
+    return this.http.post<any>(`${this.API_URL}/${id}/spell-cast`, data);
+  }
+
+  getSpellCasts(id: string): Observable<any> {
+    return this.http.get<any>(`${this.API_URL}/${id}/spell-casts`);
+  }
+
   deleteCharacter(id: string): Observable<any> {
     return this.http.delete<any>(`${this.API_URL}/${id}`);
   }

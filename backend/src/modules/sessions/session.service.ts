@@ -5,6 +5,12 @@ import PDFDocument from 'pdfkit';
 
 const characterService = new CharacterService();
 
+type SessionLogUpdateInput = {
+  narrativeLog?: string;
+  privateGmNotes?: string;
+  highlights?: string[];
+};
+
 export class SessionService {
   async createSession(
     createdBy: string,
@@ -71,10 +77,19 @@ export class SessionService {
     );
   }
 
-  async getSessionsByCampaign(campaignId: string) {
-    return prisma.session.findMany({
+  async getSessionsByCampaign(campaignId: string, viewerId: string) {
+    const sessions = await prisma.session.findMany({
       where: { campaignId },
       include: {
+        campaign: {
+          select: {
+            ownerId: true,
+            members: {
+              where: { userId: viewerId },
+              select: { role: true },
+            },
+          },
+        },
         creator: {
           select: {
             id: true,
@@ -88,9 +103,25 @@ export class SessionService {
         date: 'desc',
       },
     });
+
+    return sessions.map((session) => {
+      const isGm =
+        session.campaign.ownerId === viewerId ||
+        session.campaign.members.some((member) => member.role === 'GM');
+
+      const { campaign, privateGmNotes, ...rest } = session;
+      if (isGm) {
+        return {
+          ...rest,
+          privateGmNotes,
+        };
+      }
+
+      return rest;
+    });
   }
 
-  async getSessionById(sessionId: string) {
+  async getSessionById(sessionId: string, viewerId: string) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
       include: {
@@ -99,6 +130,15 @@ export class SessionService {
             id: true,
             name: true,
             system: true,
+            ownerId: true,
+            members: {
+              where: {
+                userId: viewerId,
+              },
+              select: {
+                role: true,
+              },
+            },
           },
         },
         creator: {
@@ -125,7 +165,16 @@ export class SessionService {
       throw new AppError(404, 'Session not found');
     }
 
-    return session;
+    const isGm =
+      session.campaign.ownerId === viewerId ||
+      session.campaign.members.some((member) => member.role === 'GM');
+
+    if (isGm) {
+      return session;
+    }
+
+    const { privateGmNotes, ...sanitizedSession } = session;
+    return sanitizedSession;
   }
 
   async updateSession(
@@ -146,14 +195,32 @@ export class SessionService {
     });
   }
 
+  async updateSessionLog(sessionId: string, data: SessionLogUpdateInput) {
+    return prisma.session.update({
+      where: { id: sessionId },
+      data: {
+        narrativeLog: data.narrativeLog,
+        privateGmNotes: data.privateGmNotes,
+        highlights: data.highlights,
+      },
+      select: {
+        id: true,
+        narrativeLog: true,
+        privateGmNotes: true,
+        highlights: true,
+        updatedAt: true,
+      },
+    });
+  }
+
   async deleteSession(sessionId: string) {
     await prisma.session.delete({
       where: { id: sessionId },
     });
   }
 
-  async generateReport(sessionId: string): Promise<Buffer> {
-    const session = await this.getSessionById(sessionId);
+  async generateReport(sessionId: string, viewerId: string): Promise<Buffer> {
+    const session = await this.getSessionById(sessionId, viewerId);
 
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument();

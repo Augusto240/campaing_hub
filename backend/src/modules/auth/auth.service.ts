@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
-import jwt, { Secret, SignOptions } from 'jsonwebtoken';
+import { createHash } from 'crypto';
+import jwt, { Algorithm, Secret, SignOptions } from 'jsonwebtoken';
 import { prisma } from '../../config/database';
 import { AppError } from '../../utils/error-handler';
 
@@ -17,6 +18,8 @@ const DURATION_UNITS_IN_MS: Record<string, number> = {
   d: 24 * 60 * 60 * 1000,
   w: 7 * 24 * 60 * 60 * 1000,
 };
+const JWT_ALGORITHM: Algorithm = 'HS256';
+const MIN_SECRET_LENGTH = 32;
 
 const parseDurationToMs = (duration: string): number => {
   const normalized = duration.trim();
@@ -58,6 +61,12 @@ export class AuthService {
       throw new Error('[FATAL] JWT_SECRET e JWT_REFRESH_SECRET sao obrigatorios. Veja .env.example');
     }
 
+    if (jwtSecret.length < MIN_SECRET_LENGTH || jwtRefreshSecret.length < MIN_SECRET_LENGTH) {
+      throw new Error(
+        `[FATAL] JWT_SECRET e JWT_REFRESH_SECRET devem ter no minimo ${MIN_SECRET_LENGTH} caracteres.`
+      );
+    }
+
     const jwtExpiresIn = (process.env.JWT_EXPIRES_IN || '15m') as SignOptions['expiresIn'];
     const jwtRefreshExpiresIn = (process.env.JWT_REFRESH_EXPIRES_IN ||
       '7d') as SignOptions['expiresIn'];
@@ -66,7 +75,13 @@ export class AuthService {
     this.jwtRefreshSecret = jwtRefreshSecret;
     this.jwtExpiresIn = jwtExpiresIn;
     this.jwtRefreshExpiresIn = jwtRefreshExpiresIn;
-    this.refreshTokenTtlMs = parseDurationToMs(String(jwtRefreshExpiresIn));
+    try {
+      this.refreshTokenTtlMs = parseDurationToMs(String(jwtRefreshExpiresIn));
+    } catch (error) {
+      throw new Error(
+        `[FATAL] JWT_REFRESH_EXPIRES_IN invalido: "${String(jwtRefreshExpiresIn)}".`
+      );
+    }
   }
 
   async register(name: string, email: string, password: string) {
@@ -137,12 +152,15 @@ export class AuthService {
 
   async refreshToken(token: string) {
     try {
-      const decoded = jwt.verify(token, this.jwtRefreshSecret) as TokenPayload;
+      const tokenHash = this.hashRefreshToken(token);
+      const decoded = jwt.verify(token, this.jwtRefreshSecret, {
+        algorithms: [JWT_ALGORITHM],
+      }) as TokenPayload;
       const now = new Date();
 
       return prisma.$transaction(async (tx) => {
         const storedToken = await tx.refreshToken.findUnique({
-          where: { token },
+          where: { token: tokenHash },
         });
 
         if (!storedToken) {
@@ -197,7 +215,7 @@ export class AuthService {
 
         await tx.refreshToken.create({
           data: {
-            token: newRefreshToken,
+            token: this.hashRefreshToken(newRefreshToken),
             userId: user.id,
             expiresAt: this.calculateRefreshExpiryDate(),
             revoked: false,
@@ -218,8 +236,9 @@ export class AuthService {
   }
 
   async logout(token: string) {
+    const tokenHash = this.hashRefreshToken(token);
     await prisma.refreshToken.updateMany({
-      where: { token, revoked: false },
+      where: { token: tokenHash, revoked: false },
       data: { revoked: true },
     });
   }
@@ -248,9 +267,11 @@ export class AuthService {
 
     const accessToken = jwt.sign(payload, this.jwtSecret, {
       expiresIn: this.jwtExpiresIn,
+      algorithm: JWT_ALGORITHM,
     });
     const refreshToken = jwt.sign(payload, this.jwtRefreshSecret, {
       expiresIn: this.jwtRefreshExpiresIn,
+      algorithm: JWT_ALGORITHM,
     });
 
     return { accessToken, refreshToken };
@@ -269,12 +290,16 @@ export class AuthService {
 
       await tx.refreshToken.create({
         data: {
-          token,
+          token: this.hashRefreshToken(token),
           userId,
           expiresAt: this.calculateRefreshExpiryDate(),
           revoked: false,
         },
       });
     });
+  }
+
+  private hashRefreshToken(token: string) {
+    return createHash('sha256').update(token).digest('hex');
   }
 }

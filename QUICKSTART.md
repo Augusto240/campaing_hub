@@ -1,105 +1,80 @@
-# Campaign Hub - Quick Start Guide
+# Campaign Hub - Quick Start
 
-## 🚀 Quick Start with Docker (Easiest)
+## Docker (recommended)
 
-1. **Prerequisites**: Install Docker and Docker Compose
-
-2. **Clone and run**:
+1. Copy backend environment variables:
 ```bash
-cd campaign-hub
-docker-compose up --build
+cp backend/.env.example backend/.env
 ```
+2. Fill in `backend/.env`:
+- `JWT_SECRET` (min 32 chars)
+- `JWT_REFRESH_SECRET` (min 32 chars)
+3. Start services:
+```bash
+docker compose up -d --build
+```
+4. Verify:
+- Frontend: `http://localhost`
+- API: `http://localhost:3000/api`
+- Health: `http://localhost:3000/health`
 
-3. **Access the app**:
-   - Frontend: http://localhost
-   - Backend API: http://localhost/api
-
-4. **First time setup**: The database will be automatically migrated!
-
----
-
-## 📝 Manual Setup
+## Manual setup
 
 ### Backend
-
 ```bash
 cd backend
 npm install
 cp .env.example .env
-# Edit .env with your database URL
-npm run prisma:generate
-npm run prisma:migrate
+npm run prisma:migrate:deploy
 npm run dev
 ```
 
 ### Frontend
-
 ```bash
 cd frontend
 npm install
 npm start
 ```
 
----
+## Migrations
 
-## 🎮 Usage
+Expected migration order:
+- `20260320110000_initial_schema`
+- `20260320120000_security_hardening`
+- `20260320143000_phase3_multisystem`
 
-1. **Register** a new account
-2. **Create** your first campaign
-3. **Invite** players or add them manually
-4. **Create** characters for the campaign
-5. **Record** sessions and award XP
-6. **Track** everything in the dashboard!
+In clean environments, use `prisma migrate deploy`.
 
----
+## Phase 3 routes (quick check)
 
-## 🔑 Default Test Users
+- `GET /api/rpg-systems`
+- `POST /api/dice/roll`
+- `GET /api/dice/campaign/:campaignId`
+- `GET /api/wiki/campaign/:campaignId`
+- `PATCH /api/sessions/:sessionId/log`
+- `POST /api/characters/:characterId/sanity-check`
+- `POST /api/characters/:characterId/spell-cast`
 
-After running migrations, you can create test users:
+## Frontend routes (quick check)
 
+- `http://localhost/campaigns/:id/wiki`
+- `http://localhost/campaigns/:id/tools`
+- `http://localhost/dice`
+
+## Troubleshooting
+
+### Database does not start
 ```bash
-cd backend
-npm run seed  # If seed script is available
+docker compose logs -f postgres
 ```
 
-Or register through the UI at `/auth/register`
-
----
-
-## 📚 More Information
-
-See the main [README.md](README.md) for:
-- Complete API documentation
-- Architecture details
-- Advanced features
-- Deployment guides
-- Contributing guidelines
-
----
-
-## ❓ Common Issues
-
-### Port already in use
+### Backend cannot connect
 ```bash
-# Change ports in docker-compose.yml or .env files
+docker compose logs -f backend
 ```
 
-### Database connection failed
+### Reset everything
 ```bash
-# Make sure PostgreSQL is running
-# Check DATABASE_URL in .env
+docker compose down -v
+docker compose up -d --build
 ```
-
-### Frontend can't reach backend
-```bash
-# Check CORS_ORIGIN in backend .env
-# Verify API_URL in frontend environment.ts
-```
-
----
-
-## 🆘 Need Help?
-
-- Open an [issue](https://github.com/yourusername/campaign-hub/issues)
-- Check [documentation](README.md)
-- Contact: your-email@example.com

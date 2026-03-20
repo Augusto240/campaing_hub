@@ -25,6 +25,13 @@ export class SessionService {
     return this.http.put<any>(`${this.API_URL}/${id}`, data);
   }
 
+  updateSessionLog(
+    id: string,
+    data: { narrativeLog?: string; privateGmNotes?: string; highlights?: string[] }
+  ): Observable<any> {
+    return this.http.patch<any>(`${this.API_URL}/${id}/log`, data);
+  }
+
   deleteSession(id: string): Observable<any> {
     return this.http.delete<any>(`${this.API_URL}/${id}`);
   }

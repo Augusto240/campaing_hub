@@ -56,6 +56,28 @@ const resolveCampaignId = async (req: AuthRequest): Promise<string | null> => {
     }
   }
 
+  const wikiPageId = req.params.wikiPageId || req.body.wikiPageId;
+  if (wikiPageId) {
+    const wikiPage = await prisma.wikiPage.findUnique({
+      where: { id: wikiPageId },
+      select: { campaignId: true },
+    });
+    if (wikiPage) {
+      return wikiPage.campaignId;
+    }
+  }
+
+  const diceRollId = req.params.diceRollId || req.body.diceRollId;
+  if (diceRollId) {
+    const diceRoll = await prisma.diceRoll.findUnique({
+      where: { id: diceRollId },
+      select: { campaignId: true },
+    });
+    if (diceRoll) {
+      return diceRoll.campaignId;
+    }
+  }
+
   return null;
 };
 

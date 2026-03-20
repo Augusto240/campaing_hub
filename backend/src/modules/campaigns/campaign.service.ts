@@ -1,15 +1,20 @@
 import { prisma } from '../../config/database';
 import { AppError } from '../../utils/error-handler';
 import { Parser } from 'json2csv';
+import { RpgSystemService } from '../rpg-systems/rpg-system.service';
+
+const rpgSystemService = new RpgSystemService();
 
 export class CampaignService {
   async createCampaign(ownerId: string, name: string, description: string | undefined, system: string) {
     return prisma.$transaction(async (tx) => {
+      const systemTemplate = await rpgSystemService.resolveSystemFromInput(system, tx);
       const campaign = await tx.campaign.create({
         data: {
           name,
           description,
-          system,
+          system: systemTemplate?.slug ?? system,
+          systemId: systemTemplate?.id ?? null,
           ownerId,
         },
         include: {
@@ -20,6 +25,7 @@ export class CampaignService {
               email: true,
             },
           },
+          systemTemplate: true,
         },
       });
 
@@ -58,6 +64,7 @@ export class CampaignService {
             email: true,
           },
         },
+        systemTemplate: true,
         members: {
           include: {
             user: {
@@ -96,6 +103,7 @@ export class CampaignService {
             email: true,
           },
         },
+        systemTemplate: true,
         members: {
           include: {
             user: {
@@ -144,9 +152,23 @@ export class CampaignService {
     campaignId: string,
     data: { name?: string; description?: string; system?: string }
   ) {
+    let systemId: string | null | undefined;
+    let normalizedSystem: string | undefined;
+
+    if (data.system) {
+      const systemTemplate = await rpgSystemService.resolveSystemFromInput(data.system);
+      systemId = systemTemplate?.id ?? null;
+      normalizedSystem = systemTemplate?.slug ?? data.system;
+    }
+
     const campaign = await prisma.campaign.update({
       where: { id: campaignId },
-      data,
+      data: {
+        name: data.name,
+        description: data.description,
+        ...(normalizedSystem !== undefined ? { system: normalizedSystem } : {}),
+        ...(systemId !== undefined ? { systemId } : {}),
+      },
       include: {
         owner: {
           select: {
@@ -155,6 +177,7 @@ export class CampaignService {
             email: true,
           },
         },
+        systemTemplate: true,
       },
     });
 

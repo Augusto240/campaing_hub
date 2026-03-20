@@ -24,3 +24,13 @@ export const updateSessionSchema = z
   .refine((data) => Object.values(data).some((value) => value !== undefined), {
     message: 'At least one field must be provided',
   });
+
+export const updateSessionLogSchema = z
+  .object({
+    narrativeLog: z.string().trim().max(30000).optional(),
+    privateGmNotes: z.string().trim().max(30000).optional(),
+    highlights: z.array(z.string().trim().min(1).max(280)).max(20).optional(),
+  })
+  .refine((data) => Object.values(data).some((value) => value !== undefined), {
+    message: 'At least one field must be provided',
+  });

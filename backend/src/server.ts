@@ -11,6 +11,11 @@ import sessionRoutes from './modules/sessions/session.routes';
 import lootRoutes from './modules/loot/loot.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
 import notificationRoutes from './modules/notifications/notification.routes';
+import { startNotificationCleanup } from './modules/notifications/notification.service';
+import rpgSystemRoutes from './modules/rpg-systems/rpg-system.routes';
+import { RpgSystemService } from './modules/rpg-systems/rpg-system.service';
+import diceRoutes from './modules/dice/dice.routes';
+import wikiRoutes from './modules/wiki/wiki.routes';
 
 const requiredEnvVars = [
   'DATABASE_URL',
@@ -54,6 +59,9 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/loot', lootRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/rpg-systems', rpgSystemRoutes);
+app.use('/api/dice', diceRoutes);
+app.use('/api/wiki', wikiRoutes);
 
 app.use(errorMiddleware);
 
@@ -69,6 +77,9 @@ let server: ReturnType<typeof app.listen> | undefined;
 const startServer = async () => {
   try {
     await connectDatabase();
+    const rpgSystemService = new RpgSystemService();
+    await rpgSystemService.ensureDefaultSystems();
+    startNotificationCleanup();
 
     server = app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);

@@ -29,6 +29,10 @@ import { LootService } from '../../../core/services/loot.service';
             <span class="meta-text">Criada em {{ campaign.createdAt | date:'dd/MM/yyyy' }}</span>
           </div>
         </div>
+        <div class="header-actions">
+          <a class="btn btn-outline btn-sm" [routerLink]="['/campaigns', campaign.id, 'wiki']">Wiki</a>
+          <a class="btn btn-outline btn-sm" [routerLink]="['/campaigns', campaign.id, 'tools']">Ferramentas</a>
+        </div>
       </div>
 
       <p class="campaign-desc" *ngIf="campaign.description">{{ campaign.description }}</p>
@@ -306,7 +310,8 @@ import { LootService } from '../../../core/services/loot.service';
     </div>
   `,
   styles: [`
-    .detail-header { margin-bottom: 1rem; }
+    .detail-header { margin-bottom: 1rem; display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+    .header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
     .back-link { color: var(--text-secondary); font-size: 0.8rem; display: inline-block; margin-bottom: 0.5rem; text-decoration: none; }
     .back-link:hover { color: var(--accent-primary); }
     .detail-header h1 { font-size: 2rem; margin-bottom: 0.5rem; }
@@ -318,6 +323,9 @@ import { LootService } from '../../../core/services/loot.service';
     .system-badge { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.75rem;
       border-radius: 9999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
     .sys-dnd5e { background: rgba(201,168,76,0.15); color: #c9a84c; border: 1px solid rgba(201,168,76,0.3); }
+    .sys-pf2e { background: rgba(37,99,235,0.15); color: #2563eb; border: 1px solid rgba(37,99,235,0.3); }
+    .sys-coc7e { background: rgba(5,150,105,0.15); color: #059669; border: 1px solid rgba(5,150,105,0.3); }
+    .sys-tormenta20 { background: rgba(225,29,72,0.15); color: #e11d48; border: 1px solid rgba(225,29,72,0.3); }
     .sys-t20 { background: rgba(225,29,72,0.15); color: #e11d48; border: 1px solid rgba(225,29,72,0.3); }
     .sys-coc { background: rgba(5,150,105,0.15); color: #059669; border: 1px solid rgba(5,150,105,0.3); }
     .sys-pathfinder { background: rgba(37,99,235,0.15); color: #2563eb; border: 1px solid rgba(37,99,235,0.3); }
@@ -437,6 +445,7 @@ import { LootService } from '../../../core/services/loot.service';
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 
     @media (max-width: 768px) {
+      .detail-header { flex-direction: column; }
       .tabs { overflow-x: auto; }
       .char-grid { grid-template-columns: 1fr; }
       .header-meta { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
@@ -693,12 +702,34 @@ export class CampaignDetailComponent implements OnInit {
   }
 
   getSystemIcon(sys: string): string {
-    const icons: Record<string, string> = { DND5E: '🐉', T20: '⚡', CoC: '🐙', Pathfinder: '🏰', Other: '🎭' };
-    return icons[sys] || '🎭';
+    const key = (sys || '').toLowerCase();
+    const icons: Record<string, string> = {
+      dnd5e: 'd20',
+      pf2e: 'PF',
+      coc7e: 'CoC',
+      tormenta20: 'T20',
+      t20: 'T20',
+      coc: 'CoC',
+      pathfinder: 'PF',
+      other: 'RPG'
+    };
+    return icons[key] || 'RPG';
   }
 
   getSystemName(sys: string): string {
-    const names: Record<string, string> = { DND5E: 'D&D 5E', T20: 'Tormenta 20', CoC: 'Call of Cthulhu', Pathfinder: 'Pathfinder', Other: 'Outro' };
-    return names[sys] || sys;
+    const key = (sys || '').toLowerCase();
+    const names: Record<string, string> = {
+      dnd5e: 'D&D 5e',
+      pf2e: 'Pathfinder 2e',
+      coc7e: 'Call of Cthulhu 7e',
+      tormenta20: 'Tormenta20',
+      t20: 'Tormenta20',
+      coc: 'Call of Cthulhu',
+      pathfinder: 'Pathfinder',
+      other: 'Outro'
+    };
+    return names[key] || sys;
   }
 }
+
+

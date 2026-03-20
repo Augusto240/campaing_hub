@@ -6,14 +6,21 @@ import {
   HttpInterceptor,
   HttpErrorResponse
 } from '@angular/common/http';
-import { Observable, throwError, BehaviorSubject } from 'rxjs';
-import { catchError, filter, take, switchMap } from 'rxjs/operators';
+import { Observable, ReplaySubject, throwError } from 'rxjs';
+import { catchError, finalize, switchMap, take } from 'rxjs/operators';
 import { AuthService } from '../services/auth.service';
+
+interface RefreshTokenResponse {
+  data?: {
+    accessToken?: string;
+    refreshToken?: string;
+  };
+}
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
   private isRefreshing = false;
-  private refreshTokenSubject: BehaviorSubject<any> = new BehaviorSubject<any>(null);
+  private refreshTokenSubject = new ReplaySubject<string | null>(1);
 
   constructor(private authService: AuthService) {}
 
@@ -25,7 +32,6 @@ export class AuthInterceptor implements HttpInterceptor {
   }
 
   intercept(request: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
-    // Don't add token to auth endpoints (login, register, refresh, logout)
     if (this.isAuthEndpoint(request.url)) {
       return next.handle(request);
     }
@@ -37,16 +43,16 @@ export class AuthInterceptor implements HttpInterceptor {
     }
 
     return next.handle(request).pipe(
-      catchError(error => {
+      catchError((error: unknown) => {
         if (error instanceof HttpErrorResponse && error.status === 401 && !this.isAuthEndpoint(request.url)) {
-          return this.handle401Error(request, next);
+          return this.handle401Error(request, next, error);
         }
         return throwError(() => error);
       })
     );
   }
 
-  private addToken(request: HttpRequest<any>, token: string): HttpRequest<any> {
+  private addToken<T>(request: HttpRequest<T>, token: string): HttpRequest<T> {
     return request.clone({
       setHeaders: {
         Authorization: `Bearer ${token}`
@@ -54,38 +60,49 @@ export class AuthInterceptor implements HttpInterceptor {
     });
   }
 
-  private handle401Error(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    // If there's no refresh token, just logout silently without making API calls
+  private handle401Error(
+    request: HttpRequest<unknown>,
+    next: HttpHandler,
+    sourceError: HttpErrorResponse
+  ): Observable<HttpEvent<unknown>> {
     const refreshToken = localStorage.getItem('refreshToken');
     if (!refreshToken) {
       this.authService.clearSession();
-      return throwError(() => new Error('No refresh token available'));
+      return throwError(() => sourceError);
     }
 
-    if (!this.isRefreshing) {
-      this.isRefreshing = true;
-      this.refreshTokenSubject.next(null);
-
-      return this.authService.refreshToken().pipe(
-        switchMap((response: any) => {
-          this.isRefreshing = false;
-          this.refreshTokenSubject.next(response.data.accessToken);
-          return next.handle(this.addToken(request, response.data.accessToken));
-        }),
-        catchError(err => {
-          this.isRefreshing = false;
-          this.authService.clearSession();
-          return throwError(() => err);
-        })
-      );
-    } else {
+    if (this.isRefreshing) {
       return this.refreshTokenSubject.pipe(
-        filter(token => token != null),
         take(1),
-        switchMap(token => {
-          return next.handle(this.addToken(request, token));
+        switchMap((newAccessToken) => {
+          if (!newAccessToken) {
+            return throwError(() => sourceError);
+          }
+          return next.handle(this.addToken(request, newAccessToken));
         })
       );
     }
+
+    this.isRefreshing = true;
+    this.refreshTokenSubject = new ReplaySubject<string | null>(1);
+
+    return this.authService.refreshToken().pipe(
+      switchMap((response: RefreshTokenResponse) => {
+        const newAccessToken = response.data?.accessToken;
+        if (!newAccessToken) {
+          throw new Error('Refresh endpoint returned no access token');
+        }
+        this.refreshTokenSubject.next(newAccessToken);
+        return next.handle(this.addToken(request, newAccessToken));
+      }),
+      catchError((refreshError: unknown) => {
+        this.refreshTokenSubject.next(null);
+        this.authService.clearSession();
+        return throwError(() => refreshError);
+      }),
+      finalize(() => {
+        this.isRefreshing = false;
+      })
+    );
   }
 }
