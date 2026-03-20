@@ -1,0 +1,75 @@
+@font-face{
+    font-family:'BlackCastleMF' ;
+    src: url(Blackcastlemf-BG5n.ttf) format('truetype');
+}
+h1{
+    text-align: center;
+    color: rgb(255, 255, 255);
+    margin-top: 40px;
+    font-family: "Modern Antiqua";
+    font-size: 50px;
+}
+
+body{
+    background-image: linear-gradient( rgba(0, 0, 0, 0.9), rgba(0,0,0,0.308)),url("old\ library.jpg");
+    background-size: cover;       
+    background-position: center;    
+    background-repeat: no-repeat;          
+    min-height: 100vh;
+    background-attachment: fixed;
+
+}
+
+
+p{
+    font-family: "Modern Antiqua";
+    
+}
+
+
+.d-flex{
+    font-family: "Modern Antiqua";
+}
+
+.butao {
+    min-height: 10vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "Modern Antiqua";
+}
+
+.maisbotao {
+    min-height: 5vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "Modern Antiqua";
+}
+
+.navbar h1 {
+    color: rgb(255, 255, 255);
+    margin-top: 10px;
+}
+
+.box{
+    margin-top: 0px;
+    font-family: "Modern Antiqua";
+    
+    
+}
+
+.text-center{
+    font-size: 22px;
+    text-align: center;
+    color: white;
+    font-family: "Modern Antiqua";
+}
+
+.botao{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "Modern Antiqua";
+    min-height: 10vh;
+}

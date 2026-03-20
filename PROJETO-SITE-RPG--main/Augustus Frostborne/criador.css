@@ -1,0 +1,60 @@
+body{
+    background-image: linear-gradient( rgba(0, 0, 0, 0.9), rgba(0,0,0,0.308)),url("university.jpg");
+    background-size: cover;       
+    background-position: center;    
+    background-repeat: no-repeat;          
+    min-height: 100vh;
+    background-attachment: fixed;
+}
+
+h1{
+    font-family: "Modern Antiqua";
+}
+
+h4{
+    font-family: "Modern Antiqua";
+}
+
+nav h1{
+    margin-top: 10px;
+}
+
+.box{
+    margin-top: 50px;
+    
+}
+
+h3{
+    font-family: "Modern Antiqua";
+}
+
+.butao {
+    min-height: 10vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "Modern Antiqua";
+}
+
+.botao{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "Modern Antiqua";
+    min-height: 10vh;
+}
+
+.foto{
+    margin-top: 15px;
+    align-items: center;
+    justify-content: center;
+    display: flex;
+
+}
+
+.text-center{
+    font-size: 22px;
+    text-align: center;
+    color: white;
+    font-family: "Modern Antiqua";
+}

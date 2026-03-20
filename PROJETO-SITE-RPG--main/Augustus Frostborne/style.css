@@ -1,0 +1,58 @@
+@font-face{
+    font-family:'BlackCastleMF' ;
+    src: url(Blackcastlemf-BG5n.ttf) format('truetype');
+}
+h1{
+    text-align: center;
+    color: rgb(255, 255, 255);
+    margin-top: 40px;
+    font-family: "Modern Antiqua";
+    font-size: 50px;
+}
+
+body{
+    background-image: url(Floresta\ Negra.jpg);
+    background-size: cover;       
+    background-position: center;    
+    background-repeat: no-repeat;          
+    min-height: 100vh;
+
+}
+
+
+p{
+    font-family: "Modern Antiqua";
+}
+
+
+.d-flex{
+    font-family: "Modern Antiqua";
+}
+
+.butao {
+    min-height: 10vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "Modern Antiqua";
+}
+
+.maisbotao {
+    min-height: 5vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "Modern Antiqua";
+}
+
+.navbar h1 {
+    color: rgb(255, 255, 255);
+    margin-top: 10px;
+}
+
+.box{
+    margin-top: 70px;
+    font-family: "Modern Antiqua";
+    background-color: rgb(14, 27, 41);
+}
+

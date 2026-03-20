@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum CampaignRole {
+  GM
+  PLAYER
+}
+
+enum EventType {
+  BATTLE
+  STORY
+  NPC
+  TREASURE
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  ownedCampaigns    Campaign[]
+  campaignMembers   CampaignMember[]
+  characters        Character[]
+  notifications     Notification[]
+  activityLogs      ActivityLog[]
+  createdSessions   Session[]
+  refreshTokens     RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  revoked   Boolean  @default(false)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token, revoked])
+  @@map("refresh_tokens")
+}
+
+model Campaign {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  system      String   // DND5E, T20, CoC, etc
+  ownerId     String   @map("owner_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  owner       User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  members     CampaignMember[]
+  characters  Character[]
+  sessions    Session[]
+  events      Event[]
+
+  @@map("campaigns")
+}
+
+model CampaignMember {
+  id         String       @id @default(uuid())
+  campaignId String       @map("campaign_id")
+  userId     String       @map("user_id")
+  role       CampaignRole
+  joinedAt   DateTime     @default(now()) @map("joined_at")
+
+  // Relations
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, userId])
+  @@map("campaign_members")
+}
+
+model Character {
+  id            String   @id @default(uuid())
+  name          String
+  class         String
+  level         Int      @default(1)
+  xp            Int      @default(0)
+  version       Int      @default(0)
+  playerId      String   @map("player_id")
+  campaignId    String   @map("campaign_id")
+  sheetFileUrl  String?  @map("sheet_file_url")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  player   User      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  campaign Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  loot     Loot[]
+
+  @@map("characters")
+}
+
+model Session {
+  id         String   @id @default(uuid())
+  campaignId String   @map("campaign_id")
+  date       DateTime
+  summary    String?
+  xpAwarded  Int      @default(0) @map("xp_awarded")
+  createdBy  String   @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creator  User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  loot     Loot[]
+
+  @@map("sessions")
+}
+
+model Loot {
+  id                    String   @id @default(uuid())
+  name                  String
+  description           String?
+  value                 Float    @default(0)
+  sessionId             String   @map("session_id")
+  assignedToCharacterId String?  @map("assigned_to_character_id")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  // Relations
+  session           Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  assignedToCharacter Character? @relation(fields: [assignedToCharacterId], references: [id], onDelete: SetNull)
+
+  @@map("loot")
+}
+
+model Event {
+  id          String    @id @default(uuid())
+  campaignId  String    @map("campaign_id")
+  title       String
+  description String?
+  eventDate   DateTime  @map("event_date")
+  type        EventType
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@map("events")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("activity_logs")
+}

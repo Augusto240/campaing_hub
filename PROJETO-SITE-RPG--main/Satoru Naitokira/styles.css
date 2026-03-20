@@ -1,0 +1,109 @@
+.container{
+    color: red;
+    text-align: center;
+    
+}
+
+nav{
+    color: rgb(144, 28, 28);
+    text-align: center;
+    align-content: center;
+    padding-left: 100px;
+    font-family: Averia Libre Regular;
+}
+
+h1{
+    text-align: center;
+    align-content: center;
+    align-items: center;
+    align-self: center;
+    padding-top: 10px;
+    font-family: Averia Libre Regular;
+}
+
+body{
+    background-image: url(night.jpg);
+    background-size: cover;       
+    background-position: center;    
+    background-repeat: no-repeat;          
+    min-height: 100vh;
+    background-image: linear-gradient( rgba(0, 0, 0, 0.9), rgba(0,0,0,0.308)),url("night.jpg");
+}
+
+
+.butao {
+    min-height: 10vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: Averia Libre Regular;
+}
+
+.maisbotao {
+    min-height: 5vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: Averia Libre Regular;
+}
+
+.d-flex{  
+    min-height: 5vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: Averia Libre Regular;
+}
+
+h2{
+    text-align: center;
+    font-family: Averia Libre Regular;
+}
+
+
+@font-face {
+    font-family: 'Averia Libre Regular';
+    font-style: normal;
+    font-weight: normal;
+    src: local('Averia Libre Regular'), url('AveriaLibre-Regular.woff') format('woff');
+    }
+    
+
+    @font-face {
+    font-family: 'Averia Libre Italic';
+    font-style: normal;
+    font-weight: normal;
+    src: local('Averia Libre Italic'), url('AveriaLibre-Italic.woff') format('woff');
+    }
+    
+
+    @font-face {
+    font-family: 'Averia Libre Light';
+    font-style: normal;
+    font-weight: normal;
+    src: local('Averia Libre Light'), url('AveriaLibre-Light.woff') format('woff');
+    }
+    
+
+    @font-face {
+    font-family: 'Averia Libre Light Italic';
+    font-style: normal;
+    font-weight: normal;
+    src: local('Averia Libre Light Italic'), url('AveriaLibre-LightItalic.woff') format('woff');
+    }
+    
+
+    @font-face {
+    font-family: 'Averia Libre Bold';
+    font-style: normal;
+    font-weight: normal;
+    src: local('Averia Libre Bold'), url('AveriaLibre-Bold.woff') format('woff');
+    }
+    
+
+    @font-face {
+    font-family: 'Averia Libre Bold Italic';
+    font-style: normal;
+    font-weight: normal;
+    src: local('Averia Libre Bold Italic'), url('AveriaLibre-BoldItalic.woff') format('woff');
+    }

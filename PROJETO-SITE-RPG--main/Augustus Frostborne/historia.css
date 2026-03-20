@@ -1,0 +1,49 @@
+body{
+    background-image: linear-gradient( rgba(0, 0, 0, 0.9), rgba(0,0,0,0.308)),url("nisia2.jpg");
+    background-size: cover;       
+    background-position: center;    
+    background-repeat: no-repeat;          
+    min-height: 100vh;
+    background-attachment: fixed;
+    
+}
+
+.centralizar-imagem {
+    display: flex;
+    justify-content: center;
+}
+
+.imagem-redimensionada {
+    max-width: 25%;
+}
+
+h3{
+    font-family: "Modern Antiqua";
+    
+}
+
+p{
+    font-family: "Modern Antiqua";
+    padding-left: 400px;
+    padding-right: 400px;
+    padding-top: 30px;
+    font-size: 15px;
+}
+
+.fundo{
+    background-image: url(nisia1.png);
+}
+
+.navbar h1 {
+    color: rgb(255, 255, 255);
+    margin-top: 10px;
+    font-family: "Modern Antiqua";
+}
+
+.botao{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "Modern Antiqua";
+    min-height: 10vh;
+}

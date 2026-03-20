@@ -1,0 +1,64 @@
+.navbar{
+    color: white;
+    background-color:rgb(140, 29, 64);
+    padding-top: 2px;
+    padding-bottom: 2px;
+    text-align: center;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    font-size: 20px;
+    font-family: Tormenta;
+}
+@font-face {
+    font-family: Tormenta;
+    src: url(Tormenta20.ttf);
+ }
+
+ body{
+    background-image: linear-gradient( rgba(0, 0, 0, 0.9), rgba(0,0,0,0.308)),url("./artes\ rpg/personagens.jpg");
+    background-size: cover;       
+    background-position: center;    
+    background-repeat: no-repeat;
+    background-attachment: fixed;          
+    min-height: 100vh;
+    z-index: -1;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+ }
+
+button{
+    font-family: Tormenta;
+    font-size: 18px;
+    background-color: rgb(32, 46, 81);
+    border: 2px;
+    border-radius: 10px;
+    padding: 15px 30px;
+    color: white;
+}
+
+.butao2{
+    font-family: Tormenta;
+    font-size: 18px;
+    background-color: rgb(100, 25, 25);
+    border: 2px;
+    border-radius: 10px;
+    padding: 15px 30px;
+    color: white;
+}
+.personagens{
+    margin-left: 50%;
+    margin-right: 50px;
+    margin-top: 400px;
+    margin-bottom: 20px;
+    padding: 20px;
+    transform: translate(-50%, -50%);
+    color: white;
+    text-align: center;
+    font-family: Tormenta;
+
+}
+

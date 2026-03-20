@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: campaign-hub-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: campaign_user
+      POSTGRES_PASSWORD: campaign_pass
+      POSTGRES_DB: campaign_hub
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - campaign-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campaign_user -d campaign_hub"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: campaign-hub-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://campaign_user:campaign_pass@postgres:5432/campaign_hub
+      CORS_ORIGIN: http://localhost
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/uploads:/app/uploads
+    networks:
+      - campaign-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: campaign-hub-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - campaign-network
+
+volumes:
+  postgres_data:
+
+networks:
+  campaign-network:
+    driver: bridge
