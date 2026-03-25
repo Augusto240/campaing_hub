@@ -24,7 +24,7 @@
 
 ## 📖 Sobre o Projeto
 
-**Campaign Hub** é uma aplicação web full-stack para gerenciamento completo de campanhas de RPG de mesa. O projeto nasceu em **julho de 2023**, no 1º semestre do curso de Análise e Desenvolvimento de Sistemas no **IFRN Campus Parnamirim**, como um simples site HTML/CSS com páginas de personagens e um rolador de dados em JavaScript.
+**Campaign Hub** é uma aplicação web full-stack para gerenciamento completo de campanhas de RPG de mesa. O projeto nasceu em **julho de 2023**, no 1º semestre do curso de Tecnologia em Sistemas Para Internet no **IFRN Campus Parnamirim**, como um simples site HTML/CSS com páginas de personagens e um rolador de dados em JavaScript.
 
 Três anos depois, evoluiu para uma **plataforma completa e moderna** com autenticação, CRUD de campanhas, personagens, sessões, espólios, dashboard com estatísticas, wiki de sistemas de RPG, rolador de dados interativo e muito mais — tudo containerizado com Docker.
 
@@ -194,7 +194,7 @@ Users ──────┬──── Campaigns ────┬──── Ch
 ### 1. Clonar o repositório
 
 ```bash
-git clone https://github.com/seu-usuario/campaign-hub.git
+git clone https://github.com/Augusto240/campaign-hub.git
 cd campaign-hub
 ```
 
@@ -451,7 +451,7 @@ Este projeto está sob a licença **MIT**. Veja o arquivo [LICENSE](LICENSE) par
 
 ## 👨‍💻 Autor
 
-**Augusto** — Estudante de Análise e Desenvolvimento de Sistemas @ IFRN Campus Parnamirim
+**Augusto** — Estudante de Tecnologia em Sistemas Para Internet @ IFRN Campus Parnamirim
 
 > *"Quando eu entrei na faculdade, eu tinha um sonho de fazer uma mega aplicação web de RPG. Três anos depois, aqui está."*
 
