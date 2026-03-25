@@ -3,19 +3,14 @@ import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}
-
-export interface AuthResponse {
-  user: User;
-  accessToken: string;
-  refreshToken: string;
-}
+import {
+  User,
+  AuthResponse,
+  RefreshResponse,
+  ApiResponse,
+  RegisterRequest,
+  LoginRequest,
+} from '../types/api.types';
 
 @Injectable({
   providedIn: 'root'
@@ -46,8 +41,9 @@ export class AuthService {
     }
   }
 
-  register(name: string, email: string, password: string): Observable<any> {
-    return this.http.post<any>(`${this.API_URL}/register`, { name, email, password })
+  register(name: string, email: string, password: string): Observable<ApiResponse<AuthResponse>> {
+    const payload: RegisterRequest = { name, email, password };
+    return this.http.post<ApiResponse<AuthResponse>>(`${this.API_URL}/register`, payload)
       .pipe(
         tap(response => {
           if (response.data) {
@@ -57,8 +53,9 @@ export class AuthService {
       );
   }
 
-  login(email: string, password: string): Observable<any> {
-    return this.http.post<any>(`${this.API_URL}/login`, { email, password })
+  login(email: string, password: string): Observable<ApiResponse<AuthResponse>> {
+    const payload: LoginRequest = { email, password };
+    return this.http.post<ApiResponse<AuthResponse>>(`${this.API_URL}/login`, payload)
       .pipe(
         tap(response => {
           if (response.data) {
@@ -91,9 +88,9 @@ export class AuthService {
     this.router.navigate(['/auth/login']);
   }
 
-  refreshToken(): Observable<any> {
+  refreshToken(): Observable<ApiResponse<RefreshResponse>> {
     const refreshToken = localStorage.getItem('refreshToken');
-    return this.http.post<any>(`${this.API_URL}/refresh`, { refreshToken })
+    return this.http.post<ApiResponse<RefreshResponse>>(`${this.API_URL}/refresh`, { refreshToken })
       .pipe(
         tap(response => {
           if (response.data) {
@@ -104,8 +101,8 @@ export class AuthService {
       );
   }
 
-  getProfile(): Observable<any> {
-    return this.http.get<any>(`${this.API_URL}/profile`);
+  getProfile(): Observable<ApiResponse<User>> {
+    return this.http.get<ApiResponse<User>>(`${this.API_URL}/profile`);
   }
 
   private setSession(authResult: AuthResponse): void {

@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { RpgSystem, ApiResponse } from '../types/api.types';
 
 @Injectable({ providedIn: 'root' })
 export class RpgSystemService {
@@ -9,8 +10,11 @@ export class RpgSystemService {
 
   constructor(private http: HttpClient) {}
 
-  getSystems(): Observable<any> {
-    return this.http.get<any>(this.API_URL);
+  getSystems(): Observable<ApiResponse<RpgSystem[]>> {
+    return this.http.get<ApiResponse<RpgSystem[]>>(this.API_URL);
+  }
+
+  getSystemBySlug(slug: string): Observable<ApiResponse<RpgSystem>> {
+    return this.http.get<ApiResponse<RpgSystem>>(`${this.API_URL}/${slug}`);
   }
 }
-

@@ -3,13 +3,12 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
+import { Notification, ApiResponse } from '../types/api.types';
 
-export interface Notification {
-  id: string;
-  userId: string;
-  message: string;
-  read: boolean;
-  createdAt: string;
+/** Response for listing notifications */
+export interface NotificationListResponse {
+  notifications: Notification[];
+  unreadCount: number;
 }
 
 @Injectable({
@@ -22,8 +21,8 @@ export class NotificationService {
 
   constructor(private http: HttpClient) {}
 
-  getNotifications(): Observable<any> {
-    return this.http.get<any>(this.API_URL).pipe(
+  getNotifications(): Observable<ApiResponse<NotificationListResponse>> {
+    return this.http.get<ApiResponse<NotificationListResponse>>(this.API_URL).pipe(
       tap(response => {
         if (response.data) {
           this.unreadCountSubject.next(response.data.unreadCount);
@@ -32,8 +31,8 @@ export class NotificationService {
     );
   }
 
-  markAsRead(notificationId: string): Observable<any> {
-    return this.http.put<any>(`${this.API_URL}/${notificationId}/read`, {}).pipe(
+  markAsRead(notificationId: string): Observable<ApiResponse<Notification>> {
+    return this.http.put<ApiResponse<Notification>>(`${this.API_URL}/${notificationId}/read`, {}).pipe(
       tap(() => {
         const currentCount = this.unreadCountSubject.value;
         this.unreadCountSubject.next(Math.max(0, currentCount - 1));
@@ -41,8 +40,8 @@ export class NotificationService {
     );
   }
 
-  markAllAsRead(): Observable<any> {
-    return this.http.put<any>(`${this.API_URL}/read-all`, {}).pipe(
+  markAllAsRead(): Observable<ApiResponse<{ message: string; count: number }>> {
+    return this.http.put<ApiResponse<{ message: string; count: number }>>(`${this.API_URL}/read-all`, {}).pipe(
       tap(() => {
         this.unreadCountSubject.next(0);
       })
