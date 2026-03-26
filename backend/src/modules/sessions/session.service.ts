@@ -1,4 +1,5 @@
 import { prisma } from '../../config/database';
+import { emitCampaignEvent } from '../../config/realtime';
 import { AppError } from '../../utils/error-handler';
 import { CharacterService } from '../characters/character.service';
 import PDFDocument from 'pdfkit';
@@ -19,7 +20,7 @@ export class SessionService {
     summary: string | undefined,
     xpAwarded: number
   ) {
-    return prisma.$transaction(
+    const createdSession = await prisma.$transaction(
       async (tx) => {
         const session = await tx.session.create({
           data: {
@@ -75,6 +76,18 @@ export class SessionService {
       },
       { isolationLevel: 'Serializable' }
     );
+
+    emitCampaignEvent(createdSession.campaignId, 'session:created', {
+      session: {
+        id: createdSession.id,
+        campaignId: createdSession.campaignId,
+        date: createdSession.date,
+        summary: createdSession.summary,
+        xpAwarded: createdSession.xpAwarded,
+      },
+    });
+
+    return createdSession;
   }
 
   async getSessionsByCampaign(campaignId: string, viewerId: string) {
@@ -196,7 +209,7 @@ export class SessionService {
   }
 
   async updateSessionLog(sessionId: string, data: SessionLogUpdateInput) {
-    return prisma.session.update({
+    const updatedLog = await prisma.session.update({
       where: { id: sessionId },
       data: {
         narrativeLog: data.narrativeLog,
@@ -211,6 +224,22 @@ export class SessionService {
         updatedAt: true,
       },
     });
+
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      select: { campaignId: true },
+    });
+
+    if (session) {
+      emitCampaignEvent(session.campaignId, 'session:log_updated', {
+        sessionId: updatedLog.id,
+        narrativeLog: updatedLog.narrativeLog,
+        highlights: updatedLog.highlights,
+        updatedAt: updatedLog.updatedAt,
+      });
+    }
+
+    return updatedLog;
   }
 
   async deleteSession(sessionId: string) {

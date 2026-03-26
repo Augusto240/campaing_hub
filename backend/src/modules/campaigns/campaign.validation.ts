@@ -29,3 +29,10 @@ export const removeCampaignMemberParamsSchema = z.object({
   campaignId: z.string().uuid(),
   userId: z.string().uuid(),
 });
+
+export const generateEncounterSchema = z.object({
+  partyLevel: z.number().int().positive().max(20),
+  partySize: z.number().int().positive().max(10),
+  environment: z.string().trim().min(1).max(120),
+  difficulty: z.enum(['easy', 'medium', 'hard', 'deadly']),
+});

@@ -1,4 +1,6 @@
 import { Prisma } from '@prisma/client';
+import { sanityChecksTotal } from '../../config/metrics';
+import { emitCampaignEvent } from '../../config/realtime';
 import { prisma } from '../../config/database';
 import { AppError } from '../../utils/error-handler';
 import { calculateLevelFromXP } from '../../utils/xp-calculator';
@@ -264,6 +266,8 @@ export class CharacterService {
       where: { id: characterId },
       select: {
         id: true,
+        name: true,
+        campaignId: true,
         resources: true,
       },
     });
@@ -278,7 +282,7 @@ export class CharacterService {
       ...resourcesPatch,
     };
 
-    return prisma.character.update({
+    const updatedCharacter = await prisma.character.update({
       where: { id: characterId },
       data: {
         resources: mergedResources,
@@ -289,6 +293,14 @@ export class CharacterService {
         resources: true,
       },
     });
+
+    emitCampaignEvent(character.campaignId, 'character:resources_updated', {
+      characterId: updatedCharacter.id,
+      characterName: updatedCharacter.name,
+      resources: updatedCharacter.resources,
+    });
+
+    return updatedCharacter;
   }
 
   async deleteCharacter(characterId: string) {
@@ -398,7 +410,7 @@ export class CharacterService {
     const tempInsanity = sanityLoss >= 5 ? 'Temporary insanity triggered' : null;
     const permInsanity = newSanity === 0 ? 'Permanent insanity triggered' : null;
 
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const sanityEvent = await tx.sanityEvent.create({
         data: {
           characterId,
@@ -439,6 +451,19 @@ export class CharacterService {
         character: updatedCharacter,
       };
     });
+
+    sanityChecksTotal.inc();
+    emitCampaignEvent(character.campaignId, 'character:sanity_changed', {
+      characterId: result.character.id,
+      characterName: result.character.name,
+      newSanity: toJsonObject(result.character.resources).sanity ?? newSanity,
+      sanityLost: result.sanityEvent.sanityLost,
+      trigger: result.sanityEvent.trigger,
+      tempInsanity: result.sanityEvent.tempInsanity ?? null,
+      permInsanity: result.sanityEvent.permInsanity ?? null,
+    });
+
+    return result;
   }
 
   async castSpell(characterId: string, payload: SpellCastInput) {
@@ -498,7 +523,7 @@ export class CharacterService {
       }
     }
 
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const spellCast = await tx.spellCast.create({
         data: {
           characterId,
@@ -531,6 +556,25 @@ export class CharacterService {
         character: updatedCharacter,
       };
     });
+
+    emitCampaignEvent(character.campaignId, 'character:resources_updated', {
+      characterId: result.character.id,
+      characterName: result.character.name,
+      resources: result.character.resources,
+    });
+
+    emitCampaignEvent(character.campaignId, 'character:spell_cast', {
+      characterId: result.character.id,
+      characterName: result.character.name,
+      spellName: result.spellCast.spellName,
+      manaCost: result.spellCast.manaCost,
+      faithCost: result.spellCast.faithCost,
+      result: result.spellCast.result ?? null,
+      sessionId: result.spellCast.sessionId ?? null,
+      createdAt: result.spellCast.createdAt,
+    });
+
+    return result;
   }
 
   async addXP(characterId: string, xpAmount: number, client: PrismaClientLike = prisma) {
@@ -605,4 +649,3 @@ export class CharacterService {
     throw new AppError(409, 'Character update conflict. Please retry the request.', true, 'CONFLICT');
   }
 }
-

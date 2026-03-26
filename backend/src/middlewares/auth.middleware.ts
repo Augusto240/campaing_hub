@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt, { Algorithm } from 'jsonwebtoken';
 import { AppError } from '../utils/error-handler';
-import { prisma } from '../config/database';
+import { verifyAccessToken } from '../modules/auth/auth.service';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -10,12 +9,10 @@ export interface AuthRequest extends Request {
     role: string;
   };
 }
-const JWT_ALGORITHM: Algorithm = 'HS256';
-const MIN_SECRET_LENGTH = 32;
 
 export const authenticate = async (
   req: AuthRequest,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) => {
   try {
@@ -26,27 +23,7 @@ export const authenticate = async (
     }
 
     const token = authHeader.substring(7);
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      throw new Error('[FATAL] JWT_SECRET is required');
-    }
-    if (secret.length < MIN_SECRET_LENGTH) {
-      throw new Error(`[FATAL] JWT_SECRET must have at least ${MIN_SECRET_LENGTH} characters`);
-    }
-
-    const decoded = jwt.verify(token, secret, { algorithms: [JWT_ALGORITHM] }) as {
-      id: string;
-      email: string;
-      role: string;
-    };
-
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-    });
-
-    if (!user) {
-      throw new AppError(401, 'User not found');
-    }
+    const user = await verifyAccessToken(token);
 
     req.user = {
       id: user.id,
@@ -56,9 +33,9 @@ export const authenticate = async (
 
     next();
   } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
+    if ((error as Error).name === 'TokenExpiredError') {
       next(new AppError(401, 'Token expired'));
-    } else if (error instanceof jwt.JsonWebTokenError) {
+    } else if ((error as Error).name === 'JsonWebTokenError') {
       next(new AppError(401, 'Invalid token'));
     } else {
       next(error);
@@ -67,7 +44,7 @@ export const authenticate = async (
 };
 
 export const authorize = (...roles: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
+  return (req: AuthRequest, _res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(new AppError(401, 'Not authenticated'));
     }

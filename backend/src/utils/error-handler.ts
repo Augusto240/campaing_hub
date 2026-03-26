@@ -1,5 +1,6 @@
 import { Response, NextFunction, Request } from 'express';
 import { ZodError } from 'zod';
+import { logger } from '../config/logger';
 
 export class AppError extends Error {
   constructor(
@@ -38,7 +39,7 @@ export const handleError = (err: Error | AppError, res: Response) => {
     });
   }
 
-  console.error('ERROR', err);
+  logger.error({ err }, 'Unhandled error');
 
   return res.status(500).json({
     status: 'error',

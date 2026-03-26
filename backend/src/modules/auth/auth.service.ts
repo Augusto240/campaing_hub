@@ -4,7 +4,7 @@ import jwt, { Algorithm, Secret, SignOptions } from 'jsonwebtoken';
 import { prisma } from '../../config/database';
 import { AppError } from '../../utils/error-handler';
 
-interface TokenPayload {
+export interface TokenPayload {
   id: string;
   email: string;
   role: string;
@@ -46,6 +46,44 @@ const parseDurationToMs = (duration: string): number => {
   return amount * unitMs;
 };
 
+const getRequiredSecret = (
+  secretName: 'JWT_SECRET' | 'JWT_REFRESH_SECRET'
+): string => {
+  const secret = process.env[secretName];
+
+  if (!secret) {
+    throw new Error(`[FATAL] ${secretName} is required`);
+  }
+
+  if (secret.length < MIN_SECRET_LENGTH) {
+    throw new Error(`[FATAL] ${secretName} must have at least ${MIN_SECRET_LENGTH} characters`);
+  }
+
+  return secret;
+};
+
+export const verifyAccessToken = async (token: string): Promise<TokenPayload> => {
+  if (!token) {
+    throw new AppError(401, 'Authentication token required');
+  }
+
+  const secret = getRequiredSecret('JWT_SECRET');
+  const decoded = jwt.verify(token, secret, { algorithms: [JWT_ALGORITHM] }) as TokenPayload;
+  const user = await prisma.user.findUnique({
+    where: { id: decoded.id },
+  });
+
+  if (!user) {
+    throw new AppError(401, 'User not found');
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+  };
+};
+
 export class AuthService {
   private readonly jwtSecret: Secret;
   private readonly jwtRefreshSecret: Secret;
@@ -54,18 +92,8 @@ export class AuthService {
   private readonly refreshTokenTtlMs: number;
 
   constructor() {
-    const jwtSecret = process.env.JWT_SECRET;
-    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET;
-
-    if (!jwtSecret || !jwtRefreshSecret) {
-      throw new Error('[FATAL] JWT_SECRET e JWT_REFRESH_SECRET sao obrigatorios. Veja .env.example');
-    }
-
-    if (jwtSecret.length < MIN_SECRET_LENGTH || jwtRefreshSecret.length < MIN_SECRET_LENGTH) {
-      throw new Error(
-        `[FATAL] JWT_SECRET e JWT_REFRESH_SECRET devem ter no minimo ${MIN_SECRET_LENGTH} caracteres.`
-      );
-    }
+    const jwtSecret = getRequiredSecret('JWT_SECRET');
+    const jwtRefreshSecret = getRequiredSecret('JWT_REFRESH_SECRET');
 
     const jwtExpiresIn = (process.env.JWT_EXPIRES_IN || '15m') as SignOptions['expiresIn'];
     const jwtRefreshExpiresIn = (process.env.JWT_REFRESH_EXPIRES_IN ||

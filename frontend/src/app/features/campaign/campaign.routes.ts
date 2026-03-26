@@ -14,6 +14,18 @@ export const CAMPAIGN_ROUTES: Routes = [
     loadComponent: () => import('./campaign-tools/campaign-tools.component').then(m => m.CampaignToolsComponent)
   },
   {
+    path: ':id/combat',
+    loadComponent: () => import('./campaign-combat/campaign-combat.component').then(m => m.CampaignCombatComponent)
+  },
+  {
+    path: ':id/compendium',
+    loadComponent: () => import('./campaign-compendium/campaign-compendium.component').then(m => m.CampaignCompendiumComponent)
+  },
+  {
+    path: ':id/schedule',
+    loadComponent: () => import('./campaign-schedule/campaign-schedule.component').then(m => m.CampaignScheduleComponent)
+  },
+  {
     path: ':id',
     loadComponent: () => import('./campaign-detail/campaign-detail.component').then(m => m.CampaignDetailComponent)
   }

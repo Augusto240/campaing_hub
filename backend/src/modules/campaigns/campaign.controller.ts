@@ -8,6 +8,7 @@ import {
   addCampaignMemberSchema,
   campaignIdParamsSchema,
   createCampaignSchema,
+  generateEncounterSchema,
   removeCampaignMemberParamsSchema,
   updateCampaignSchema,
 } from './campaign.validation';
@@ -112,5 +113,20 @@ export const exportCampaignData = asyncHandler(
     res.header('Content-Type', 'text/csv');
     res.header('Content-Disposition', `attachment; filename="campaign-${campaignId}.csv"`);
     res.send(csv);
+  }
+);
+
+/**
+ * POST /api/campaigns/:campaignId/generate-encounter
+ * Gera sugestao de encontro com base no sistema da campanha e contexto informado.
+ */
+export const generateEncounter = asyncHandler(
+  async (req: AuthRequest, res: Response, _next: NextFunction) => {
+    const { campaignId } = validate(campaignIdParamsSchema, req.params);
+    const payload = validate(generateEncounterSchema, req.body);
+
+    const encounter = await campaignService.generateEncounter(campaignId, req.user!.id, payload);
+
+    res.json(success(encounter, 'Encounter generated successfully'));
   }
 );

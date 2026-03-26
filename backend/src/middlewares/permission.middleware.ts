@@ -78,6 +78,34 @@ const resolveCampaignId = async (req: AuthRequest): Promise<string | null> => {
     }
   }
 
+  const encounterId = req.params.encounterId || req.body.encounterId;
+  if (encounterId) {
+    const encounter = await prisma.combatEncounter.findUnique({
+      where: { id: encounterId },
+      select: {
+        session: {
+          select: {
+            campaignId: true,
+          },
+        },
+      },
+    });
+    if (encounter) {
+      return encounter.session.campaignId;
+    }
+  }
+
+  const proposalId = req.params.proposalId || req.body.proposalId;
+  if (proposalId) {
+    const proposal = await prisma.sessionProposal.findUnique({
+      where: { id: proposalId },
+      select: { campaignId: true },
+    });
+    if (proposal) {
+      return proposal.campaignId;
+    }
+  }
+
   return null;
 };
 

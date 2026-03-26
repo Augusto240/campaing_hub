@@ -1,4 +1,6 @@
 import { prisma } from '../../config/database';
+import { diceRollsTotal } from '../../config/metrics';
+import { emitCampaignEvent } from '../../config/realtime';
 import { AppError } from '../../utils/error-handler';
 import { parseAndRollDice } from '../../utils/dice-parser';
 
@@ -27,6 +29,11 @@ export class DiceService {
         members: {
           where: { userId: input.userId },
           select: { role: true },
+        },
+        systemTemplate: {
+          select: {
+            slug: true,
+          },
         },
       },
     });
@@ -126,7 +133,7 @@ export class DiceService {
 
     const rolled = parseAndRollDice(input.formula, parserContext);
 
-    return prisma.diceRoll.create({
+    const createdRoll = await prisma.diceRoll.create({
       data: {
         campaignId: input.campaignId,
         sessionId: input.sessionId,
@@ -153,6 +160,33 @@ export class DiceService {
         },
       },
     });
+
+    const systemLabel =
+      campaign.systemTemplate?.slug ??
+      campaign.system?.toLowerCase().replace(/\s+/g, '-') ??
+      'unknown';
+
+    diceRollsTotal.inc({ system: systemLabel });
+
+    if (!createdRoll.isPrivate) {
+      emitCampaignEvent(createdRoll.campaignId, 'dice:rolled', {
+        id: createdRoll.id,
+        campaignId: createdRoll.campaignId,
+        sessionId: createdRoll.sessionId,
+        userId: createdRoll.userId,
+        userName: createdRoll.user.name,
+        characterId: createdRoll.characterId,
+        characterName: createdRoll.character?.name ?? null,
+        formula: createdRoll.formula,
+        result: createdRoll.result,
+        breakdown: createdRoll.breakdown,
+        label: createdRoll.label,
+        isPrivate: createdRoll.isPrivate,
+        timestamp: createdRoll.createdAt,
+      });
+    }
+
+    return createdRoll;
   }
 
   async listCampaignRolls(input: ListDiceRollsInput) {
@@ -209,4 +243,3 @@ export class DiceService {
     });
   }
 }
-

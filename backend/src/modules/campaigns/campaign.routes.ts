@@ -9,7 +9,12 @@ import {
   removeMember,
   getCampaignStats,
   exportCampaignData,
+  generateEncounter,
 } from './campaign.controller';
+import {
+  createSessionProposal,
+  listCampaignProposals,
+} from '../session-proposals/proposal.controller';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { canDeleteCampaign, canManageCampaign, isCampaignMember } from '../../middlewares/permission.middleware';
 
@@ -26,5 +31,8 @@ router.post('/:campaignId/members', canManageCampaign, addMember);
 router.delete('/:campaignId/members/:userId', canManageCampaign, removeMember);
 router.get('/:campaignId/stats', isCampaignMember, getCampaignStats);
 router.get('/:campaignId/export', isCampaignMember, exportCampaignData);
+router.post('/:campaignId/generate-encounter', canManageCampaign, generateEncounter);
+router.post('/:campaignId/session-proposals', canManageCampaign, createSessionProposal);
+router.get('/:campaignId/session-proposals', isCampaignMember, listCampaignProposals);
 
 export default router;

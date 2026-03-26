@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { RpgSystem, ApiResponse } from '../types/api.types';
+import { ApiResponse, RpgSystem } from '../types';
 
 @Injectable({ providedIn: 'root' })
 export class RpgSystemService {

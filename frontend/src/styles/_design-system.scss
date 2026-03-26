@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Crimson+Text:wght@400;600;700&family=Fira+Code:wght@400;600&family=MedievalSharp&display=swap');
+
+:root {
+  --color-bg-deepest: #0a0a0f;
+  --color-bg-deep: #111118;
+  --color-bg-surface: #1a1a25;
+  --color-bg-elevated: #22222f;
+
+  --color-primary: #c9a84c;
+  --color-primary-light: #e8c97a;
+  --color-primary-dark: #8a6a1e;
+  --color-primary-glow: rgba(201, 168, 76, 0.28);
+
+  --color-system-dnd: #d45645;
+  --color-system-pf2: #b33d37;
+  --color-system-coc: #2f5368;
+  --color-system-t20: #2f9a5f;
+
+  --color-rarity-mundane: #7f8c8d;
+  --color-rarity-common: #ecf0f1;
+  --color-rarity-uncommon: #2ecc71;
+  --color-rarity-rare: #3498db;
+  --color-rarity-very-rare: #9b59b6;
+  --color-rarity-legendary: #f39c12;
+  --color-rarity-artifact: #e74c3c;
+  --color-rarity-eldritch: #1abc9c;
+
+  --color-success: #27ae60;
+  --color-danger: #e74c3c;
+  --color-warning: #f39c12;
+  --color-sanity: #8e44ad;
+  --color-mana: #2980b9;
+
+  --font-display: 'MedievalSharp', 'Cinzel', serif;
+  --font-body: 'Crimson Text', Georgia, serif;
+  --font-mono: 'Fira Code', monospace;
+
+  --shadow-arcane: 0 0 20px var(--color-primary-glow);
+  --border-arcane: 1px solid rgba(201, 168, 76, 0.2);
+  --transition-fast: 150ms ease;
+  --transition-normal: 220ms ease;
+  --radius-sm: 0.75rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.4rem;
+
+  /* Compatibility aliases for legacy components */
+  --bg-primary: var(--color-bg-deepest);
+  --bg-secondary: var(--color-bg-deep);
+  --bg-card: var(--color-bg-surface);
+  --bg-input: color-mix(in srgb, var(--color-bg-surface) 72%, black);
+  --accent-primary: var(--color-primary);
+  --accent-secondary: var(--color-primary-dark);
+  --border-color: rgba(255, 255, 255, 0.09);
+  --border-glow: rgba(201, 168, 76, 0.28);
+  --text-primary: #f1efe8;
+  --text-secondary: #c3baa8;
+  --text-muted: #8c8577;
+  --success: var(--color-success);
+  --danger: var(--color-danger);
+  --warning: var(--color-warning);
+}

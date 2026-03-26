@@ -20,6 +20,22 @@ services:
       retries: 10
       start_period: 10s
 
+  redis:
+    image: redis:7-alpine
+    container_name: campaign-hub-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - campaign-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -31,12 +47,16 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://campaign_user:campaign_pass@postgres:5432/campaign_hub
+      REDIS_URL: redis://redis:6379
       CORS_ORIGIN: http://localhost
+      FRONTEND_URL: http://localhost
       PORT: 3000
     ports:
       - "3000:3000"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - ./backend/uploads:/app/uploads
@@ -56,8 +76,35 @@ services:
     networks:
       - campaign-network
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: campaign-hub-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+    networks:
+      - campaign-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: campaign-hub-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: rpgmaster
+    depends_on:
+      - prometheus
+    networks:
+      - campaign-network
+
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   campaign-network:

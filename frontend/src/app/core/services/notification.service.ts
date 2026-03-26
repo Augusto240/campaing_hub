@@ -3,16 +3,15 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
-import { Notification, ApiResponse } from '../types/api.types';
+import { ApiResponse, Notification } from '../types';
 
-/** Response for listing notifications */
-export interface NotificationListResponse {
+interface NotificationsResponse {
   notifications: Notification[];
   unreadCount: number;
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class NotificationService {
   private readonly API_URL = `${environment.apiUrl}/notifications`;
@@ -21,9 +20,9 @@ export class NotificationService {
 
   constructor(private http: HttpClient) {}
 
-  getNotifications(): Observable<ApiResponse<NotificationListResponse>> {
-    return this.http.get<ApiResponse<NotificationListResponse>>(this.API_URL).pipe(
-      tap(response => {
+  getNotifications(): Observable<ApiResponse<NotificationsResponse>> {
+    return this.http.get<ApiResponse<NotificationsResponse>>(this.API_URL).pipe(
+      tap((response) => {
         if (response.data) {
           this.unreadCountSubject.next(response.data.unreadCount);
         }
@@ -32,16 +31,18 @@ export class NotificationService {
   }
 
   markAsRead(notificationId: string): Observable<ApiResponse<Notification>> {
-    return this.http.put<ApiResponse<Notification>>(`${this.API_URL}/${notificationId}/read`, {}).pipe(
-      tap(() => {
-        const currentCount = this.unreadCountSubject.value;
-        this.unreadCountSubject.next(Math.max(0, currentCount - 1));
-      })
-    );
+    return this.http
+      .put<ApiResponse<Notification>>(`${this.API_URL}/${notificationId}/read`, {})
+      .pipe(
+        tap(() => {
+          const currentCount = this.unreadCountSubject.value;
+          this.unreadCountSubject.next(Math.max(0, currentCount - 1));
+        })
+      );
   }
 
-  markAllAsRead(): Observable<ApiResponse<{ message: string; count: number }>> {
-    return this.http.put<ApiResponse<{ message: string; count: number }>>(`${this.API_URL}/read-all`, {}).pipe(
+  markAllAsRead(): Observable<ApiResponse<null>> {
+    return this.http.put<ApiResponse<null>>(`${this.API_URL}/read-all`, {}).pipe(
       tap(() => {
         this.unreadCountSubject.next(0);
       })

@@ -8,6 +8,10 @@ import {
   deleteSession,
   generateSessionReport,
 } from './session.controller';
+import {
+  createCombatEncounter,
+  listSessionEncounters,
+} from '../combat/combat.controller';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { isGM, isCampaignMember } from '../../middlewares/permission.middleware';
 
@@ -22,5 +26,7 @@ router.put('/:sessionId', isGM, updateSession);
 router.patch('/:sessionId/log', isGM, updateSessionLog);
 router.delete('/:sessionId', isGM, deleteSession);
 router.get('/:sessionId/report', isCampaignMember, generateSessionReport);
+router.post('/:sessionId/combat', isGM, createCombatEncounter);
+router.get('/:sessionId/combat', isCampaignMember, listSessionEncounters);
 
 export default router;

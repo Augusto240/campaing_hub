@@ -3,19 +3,17 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
-  WikiPage,
-  WikiPageWithAuthor,
-  WikiCategory,
-  CreateWikiPageInput,
-  UpdateWikiPageInput,
   ApiResponse,
-} from '../types/api.types';
+  WikiPage,
+  WikiCategory,
+  CreateWikiPagePayload,
+  UpdateWikiPagePayload,
+} from '../types';
 
-// Re-export WikiCategory for components that import from this service
-export { WikiCategory } from '../types/api.types';
+// Re-export for backward compatibility
+export { WikiCategory } from '../types';
 
-/** Options for filtering wiki pages */
-export interface WikiPageFilterOptions {
+interface GetPagesOptions {
   category?: WikiCategory;
   search?: string;
   tag?: string;
@@ -29,8 +27,8 @@ export class WikiService {
 
   getCampaignPages(
     campaignId: string,
-    options?: WikiPageFilterOptions
-  ): Observable<ApiResponse<WikiPageWithAuthor[]>> {
+    options?: GetPagesOptions
+  ): Observable<ApiResponse<WikiPage[]>> {
     let params = new HttpParams();
     if (options?.category) {
       params = params.set('category', options.category);
@@ -42,22 +40,24 @@ export class WikiService {
       params = params.set('tag', options.tag);
     }
 
-    return this.http.get<ApiResponse<WikiPageWithAuthor[]>>(`${this.API_URL}/campaign/${campaignId}`, { params });
+    return this.http.get<ApiResponse<WikiPage[]>>(`${this.API_URL}/campaign/${campaignId}`, {
+      params,
+    });
   }
 
-  getPageById(wikiPageId: string): Observable<ApiResponse<WikiPageWithAuthor>> {
-    return this.http.get<ApiResponse<WikiPageWithAuthor>>(`${this.API_URL}/${wikiPageId}`);
+  getPageById(wikiPageId: string): Observable<ApiResponse<WikiPage>> {
+    return this.http.get<ApiResponse<WikiPage>>(`${this.API_URL}/${wikiPageId}`);
   }
 
-  createPage(payload: CreateWikiPageInput): Observable<ApiResponse<WikiPage>> {
+  createPage(payload: CreateWikiPagePayload): Observable<ApiResponse<WikiPage>> {
     return this.http.post<ApiResponse<WikiPage>>(this.API_URL, payload);
   }
 
-  updatePage(wikiPageId: string, payload: UpdateWikiPageInput): Observable<ApiResponse<WikiPage>> {
+  updatePage(wikiPageId: string, payload: UpdateWikiPagePayload): Observable<ApiResponse<WikiPage>> {
     return this.http.put<ApiResponse<WikiPage>>(`${this.API_URL}/${wikiPageId}`, payload);
   }
 
-  deletePage(wikiPageId: string): Observable<ApiResponse<{ message: string }>> {
-    return this.http.delete<ApiResponse<{ message: string }>>(`${this.API_URL}/${wikiPageId}`);
+  deletePage(wikiPageId: string): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.API_URL}/${wikiPageId}`);
   }
 }

@@ -1,21 +1,12 @@
 import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
+import { createServer } from 'http';
+import { createApp } from './app';
 import { connectDatabase, disconnectDatabase } from './config/database';
-import { errorMiddleware } from './middlewares/error.middleware';
-
-import authRoutes from './modules/auth/auth.routes';
-import campaignRoutes from './modules/campaigns/campaign.routes';
-import characterRoutes from './modules/characters/character.routes';
-import sessionRoutes from './modules/sessions/session.routes';
-import lootRoutes from './modules/loot/loot.routes';
-import dashboardRoutes from './modules/dashboard/dashboard.routes';
-import notificationRoutes from './modules/notifications/notification.routes';
+import { logger } from './config/logger';
+import { disconnectRedis } from './config/redis';
+import { setupSocket } from './config/socket';
 import { startNotificationCleanup } from './modules/notifications/notification.service';
-import rpgSystemRoutes from './modules/rpg-systems/rpg-system.routes';
 import { RpgSystemService } from './modules/rpg-systems/rpg-system.service';
-import diceRoutes from './modules/dice/dice.routes';
-import wikiRoutes from './modules/wiki/wiki.routes';
 
 const requiredEnvVars = [
   'DATABASE_URL',
@@ -25,7 +16,7 @@ const requiredEnvVars = [
   'JWT_REFRESH_EXPIRES_IN',
 ];
 
-const validateEnv = () => {
+const validateEnv = (): void => {
   const missing = requiredEnvVars.filter((envVar) => !process.env[envVar]);
   if (missing.length > 0) {
     throw new Error(`[FATAL] Missing required environment variables: ${missing.join(', ')}`);
@@ -34,85 +25,59 @@ const validateEnv = () => {
 
 validateEnv();
 
-const app = express();
+const app = createApp();
+const httpServer = createServer(app);
+setupSocket(httpServer);
+
 const PORT = Number(process.env.PORT || 3000);
 
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:4200',
-    credentials: true,
-  })
-);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-app.use('/uploads', express.static('uploads'));
-
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
-});
-
-app.use('/api/auth', authRoutes);
-app.use('/api/campaigns', campaignRoutes);
-app.use('/api/characters', characterRoutes);
-app.use('/api/sessions', sessionRoutes);
-app.use('/api/loot', lootRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/rpg-systems', rpgSystemRoutes);
-app.use('/api/dice', diceRoutes);
-app.use('/api/wiki', wikiRoutes);
-
-app.use(errorMiddleware);
-
-app.use((_req, res) => {
-  res.status(404).json({
-    status: 'error',
-    message: 'Route not found',
-  });
-});
-
-let server: ReturnType<typeof app.listen> | undefined;
-
-const startServer = async () => {
+const startServer = async (): Promise<void> => {
   try {
     await connectDatabase();
     const rpgSystemService = new RpgSystemService();
     await rpgSystemService.ensureDefaultSystems();
     startNotificationCleanup();
 
-    server = app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`API: http://localhost:${PORT}/api`);
-      console.log(`Health: http://localhost:${PORT}/health`);
+    httpServer.listen(PORT, () => {
+      logger.info(
+        {
+          port: PORT,
+          environment: process.env.NODE_ENV || 'development',
+          apiUrl: `http://localhost:${PORT}/api`,
+          healthUrl: `http://localhost:${PORT}/health`,
+          metricsUrl: `http://localhost:${PORT}/metrics`,
+        },
+        '[server] listening'
+      );
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    logger.error({ error }, '[server] failed to start');
     process.exit(1);
   }
 };
 
-const shutdown = async (signal: string) => {
-  console.log(`${signal} received. Shutting down...`);
+const shutdown = async (signal: string): Promise<void> => {
+  logger.info({ signal }, '[server] shutdown requested');
 
   try {
-    if (server) {
+    if (httpServer.listening) {
       await new Promise<void>((resolve, reject) => {
-        server!.close((err?: Error) => {
+        httpServer.close((err?: Error) => {
           if (err) {
             reject(err);
             return;
           }
+
           resolve();
         });
       });
     }
 
+    await disconnectRedis();
     await disconnectDatabase();
     process.exit(0);
   } catch (error) {
-    console.error('Error during shutdown:', error);
+    logger.error({ error }, '[server] shutdown failed');
     process.exit(1);
   }
 };

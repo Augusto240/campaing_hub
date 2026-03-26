@@ -467,3 +467,252 @@ export interface AddMemberInput {
   email: string;
   role: CampaignRole;
 }
+
+// ============================================================================
+// PAYLOAD ALIASES (for service compatibility)
+// ============================================================================
+
+export type CreateCampaignPayload = CreateCampaignInput;
+export type UpdateCampaignPayload = UpdateCampaignInput;
+export type CreateSessionPayload = CreateSessionInput;
+export type UpdateSessionPayload = UpdateSessionInput;
+export type CreateLootPayload = CreateLootInput;
+export type UpdateLootPayload = UpdateLootInput;
+export type AssignLootPayload = AssignLootInput;
+export type CreateWikiPagePayload = CreateWikiPageInput;
+export type UpdateWikiPagePayload = UpdateWikiPageInput;
+export type RollDicePayload = DiceRollInput;
+export type AddMemberPayload = AddMemberInput;
+
+// ============================================================================
+// AUTH TYPES
+// ============================================================================
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface LoginResponse {
+  user: User;
+  tokens: AuthTokens;
+}
+
+export interface RegisterResponse {
+  user: User;
+  tokens: AuthTokens;
+}
+
+// ============================================================================
+// ENCOUNTER GENERATOR
+// ============================================================================
+
+export interface GenerateEncounterPayload {
+  partyLevel: number;
+  partySize: number;
+  difficulty: 'easy' | 'medium' | 'hard' | 'deadly';
+  environment?: string;
+}
+
+export interface GeneratedEncounter {
+  creatures: Array<{
+    id: string;
+    name: string;
+    count: number;
+    xpReward: number;
+  }>;
+  totalXp: number;
+  difficulty: string;
+  environment: string;
+}
+
+// ============================================================================
+// CHARACTER PAYLOADS
+// ============================================================================
+
+export type CreateCharacterPayload = CreateCharacterInput;
+export type UpdateCharacterPayload = UpdateCharacterInput;
+
+// ============================================================================
+// SANITY (Call of Cthulhu)
+// ============================================================================
+
+export interface SanityCheckPayload {
+  trigger: string;
+  diceResult: number;
+  sanityLost: number;
+  sessionId?: string;
+}
+
+export interface SanityCheckResult {
+  success: boolean;
+  sanityLost: number;
+  currentSanity: number;
+  tempInsanity?: string;
+}
+
+export interface SanityEvent {
+  id: string;
+  characterId: string;
+  sessionId: string | null;
+  trigger: string;
+  sanityLost: number;
+  tempInsanity: string | null;
+  permInsanity: string | null;
+  createdAt: string;
+}
+
+// ============================================================================
+// SPELL CAST (Tormenta20 / Mana systems)
+// ============================================================================
+
+export interface CastSpellPayload {
+  spellName: string;
+  manaCost: number;
+  faithCost?: number;
+  result?: string;
+  sessionId?: string;
+}
+
+export interface CastSpellResult {
+  success: boolean;
+  currentMana: number;
+  cast: SpellCast;
+}
+
+export interface SpellCast {
+  id: string;
+  characterId: string;
+  sessionId: string | null;
+  spellName: string;
+  manaCost: number;
+  faithCost: number;
+  result: string | null;
+  createdAt: string;
+}
+
+// ============================================================================
+// COMBAT SYSTEM
+// ============================================================================
+
+export interface CombatEncounter {
+  id: string;
+  sessionId: string;
+  name: string;
+  isActive: boolean;
+  currentTurn: number;
+  round: number;
+  createdAt: string;
+  combatants: Combatant[];
+}
+
+export interface Combatant {
+  id: string;
+  encounterId: string;
+  name: string;
+  initiative: number;
+  hp: number;
+  maxHp: number;
+  isNpc: boolean;
+  characterId: string | null;
+  creatureId: string | null;
+  conditions: string[];
+  notes: string | null;
+  order: number;
+}
+
+export interface CreateEncounterPayload {
+  sessionId: string;
+  name: string;
+}
+
+export interface AddCombatantPayload {
+  name: string;
+  initiative: number;
+  hp: number;
+  maxHp: number;
+  isNpc?: boolean;
+  characterId?: string;
+  creatureId?: string;
+}
+
+export interface UpdateCombatantPayload {
+  initiative?: number;
+  hp?: number;
+  conditions?: string[];
+  notes?: string;
+}
+
+// ============================================================================
+// CREATURES (Bestiary)
+// ============================================================================
+
+export interface Creature {
+  id: string;
+  systemId: string;
+  name: string;
+  creatureType: string;
+  stats: Record<string, unknown>;
+  abilities: Array<{
+    name: string;
+    description: string;
+    damage?: string;
+  }>;
+  loot: Record<string, unknown> | null;
+  xpReward: number | null;
+  description: string | null;
+  isPublic: boolean;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface CreateCreaturePayload {
+  systemId: string;
+  name: string;
+  creatureType: string;
+  stats: Record<string, unknown>;
+  abilities: Array<{
+    name: string;
+    description: string;
+    damage?: string;
+  }>;
+  xpReward?: number;
+  description?: string;
+  isPublic?: boolean;
+}
+
+// ============================================================================
+// SESSION PROPOSALS
+// ============================================================================
+
+export type ProposalStatus = 'OPEN' | 'DECIDED' | 'CANCELLED';
+
+export interface SessionProposal {
+  id: string;
+  campaignId: string;
+  proposedBy: string;
+  dates: string[];
+  decidedDate: string | null;
+  status: ProposalStatus;
+  createdAt: string;
+  proposer?: Pick<User, 'id' | 'name'>;
+  votes: SessionVote[];
+}
+
+export interface SessionVote {
+  id: string;
+  proposalId: string;
+  userId: string;
+  date: string;
+  available: boolean;
+  user?: Pick<User, 'id' | 'name'>;
+}
+
+export interface CreateProposalPayload {
+  dates: string[];
+}
+
+export interface VotePayload {
+  date: string;
+  available: boolean;
+}

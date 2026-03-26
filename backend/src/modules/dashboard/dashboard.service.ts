@@ -1,29 +1,26 @@
 import { prisma } from '../../config/database';
+import { getCacheValue, setCacheValue } from '../../config/redis';
 
-const DASHBOARD_CACHE_TTL_MS = 60_000;
-const dashboardCache = new Map<string, { data: unknown; expiresAt: number }>();
+const DASHBOARD_CACHE_TTL_SECONDS = 60;
 
 const withCache = async <T>(
   key: string,
-  ttlMs: number,
+  ttlSeconds: number,
   resolver: () => Promise<T>
 ): Promise<T> => {
-  const cached = dashboardCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.data as T;
+  const cached = await getCacheValue<T>(key);
+  if (cached) {
+    return cached;
   }
 
   const data = await resolver();
-  dashboardCache.set(key, {
-    data,
-    expiresAt: Date.now() + ttlMs,
-  });
+  await setCacheValue(key, data, ttlSeconds);
   return data;
 };
 
 export class DashboardService {
   async getDashboardStats(userId: string) {
-    return withCache(`dashboard:${userId}`, DASHBOARD_CACHE_TTL_MS, async () => {
+    return withCache(`dashboard:${userId}`, DASHBOARD_CACHE_TTL_SECONDS, async () => {
       const campaigns = await prisma.campaign.findMany({
         where: {
           OR: [{ ownerId: userId }, { members: { some: { userId } } }],
@@ -48,13 +45,13 @@ export class DashboardService {
       const totalSessions = campaigns.reduce((sum, c) => sum + c.sessions.length, 0);
       const totalCharacters = campaigns.reduce((sum, c) => sum + c.characters.length, 0);
       const totalXPAwarded = campaigns.reduce(
-        (sum, c) => sum + c.sessions.reduce((s, session) => s + session.xpAwarded, 0),
+        (sum, c) => sum + c.sessions.reduce((sessionSum, session) => sessionSum + session.xpAwarded, 0),
         0
       );
 
       const avgXPPerCampaign = totalCampaigns > 0 ? totalXPAwarded / totalCampaigns : 0;
 
-      const systemStats: { [key: string]: number } = {};
+      const systemStats: Record<string, number> = {};
       campaigns.forEach((campaign) => {
         systemStats[campaign.system] = (systemStats[campaign.system] || 0) + 1;
       });
@@ -62,7 +59,7 @@ export class DashboardService {
       const mostPlayedSystem =
         Object.entries(systemStats).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
 
-      const allSessions = campaigns.flatMap((c) => c.sessions);
+      const allSessions = campaigns.flatMap((campaign) => campaign.sessions);
       const xpOverTime = this.aggregateXPOverTime(allSessions);
       const sessionsPerMonth = this.getSessionsPerMonth(allSessions);
 
@@ -72,7 +69,7 @@ export class DashboardService {
         orderBy: { createdAt: 'desc' },
       });
 
-      const allCharacters = campaigns.flatMap((c) => c.characters);
+      const allCharacters = campaigns.flatMap((campaign) => campaign.characters);
       const levelDistribution = this.getLevelDistribution(allCharacters);
 
       return {
@@ -109,10 +106,9 @@ export class DashboardService {
   }
 
   private getSessionsPerMonth(sessions: { date: Date }[]) {
-    const monthCounts: { [key: string]: number } = {};
-
-    // Get last 12 months
+    const monthCounts: Record<string, number> = {};
     const now = new Date();
+
     for (let i = 11; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -132,15 +128,15 @@ export class DashboardService {
   }
 
   private getLevelDistribution(characters: { level: number }[]) {
-    const distribution: { [level: number]: number } = {};
+    const distribution: Record<number, number> = {};
 
-    characters.forEach((char) => {
-      distribution[char.level] = (distribution[char.level] || 0) + 1;
+    characters.forEach((character) => {
+      distribution[character.level] = (distribution[character.level] || 0) + 1;
     });
 
     return Object.entries(distribution)
       .map(([level, count]) => ({
-        level: parseInt(level),
+        level: Number(level),
         count,
       }))
       .sort((a, b) => a.level - b.level);

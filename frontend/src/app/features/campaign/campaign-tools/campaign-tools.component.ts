@@ -2,805 +2,391 @@ import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { Subject, forkJoin, of } from 'rxjs';
-import { catchError, debounceTime, switchMap, takeUntil } from 'rxjs/operators';
+import { Subject, forkJoin } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { AuthService } from '../../../core/services/auth.service';
 import { CampaignService } from '../../../core/services/campaign.service';
 import { CharacterService } from '../../../core/services/character.service';
+import { CombatService } from '../../../core/services/combat.service';
+import { CreatureService } from '../../../core/services/creature.service';
+import { DiceRollService } from '../../../core/services/dice-roll.service';
+import { SessionProposalService } from '../../../core/services/session-proposal.service';
 import { SessionService } from '../../../core/services/session.service';
+import { SocketService } from '../../../core/services/socket.service';
+import { DiceResultComponent } from '../../../shared/components/dice-result.component';
+import { SystemBadgeComponent } from '../../../shared/components/system-badge.component';
+import { CampaignLogComponent } from './campaign-log.component';
+import { CampaignResourcesComponent } from './campaign-resources.component';
 
-type JsonPrimitive = string | number | boolean | null;
-type ResourceMap = Record<string, JsonPrimitive>;
-
-type CampaignMember = {
-  role: 'GM' | 'PLAYER';
-  user: {
-    id: string;
-    name: string;
-  };
-};
-
+type ResourceMap = Record<string, string | number | boolean | null>;
 type CampaignView = {
   id: string;
   name: string;
   system: string;
   ownerId: string;
-  systemTemplate?: {
-    id: string;
-    name: string;
-    hasSanity: boolean;
-    hasMana: boolean;
-  } | null;
-  members: CampaignMember[];
+  members: Array<{ role: 'GM' | 'PLAYER'; user: { id: string; name: string } }>;
+  systemTemplate?: { id: string; slug: string; hasSanity: boolean; hasMana: boolean } | null;
 };
-
-type CharacterView = {
+type CharacterView = { id: string; name: string; class: string; resources: ResourceMap | null };
+type SessionView = { id: string; date: string; narrativeLog?: string | null; privateGmNotes?: string | null; highlights?: string[] };
+type CreatureView = { id: string; name: string; creatureType: string; xpReward?: number | null; stats?: Record<string, unknown> | null };
+type CombatEncounterView = {
   id: string;
   name: string;
-  class: string;
-  resources: ResourceMap | null;
+  round: number;
+  currentTurn: number;
+  combatants: Array<{ id: string; name: string; hp: number; maxHp: number; initiative: number }>;
 };
-
-type SessionView = {
-  id: string;
-  date: string;
-  summary?: string | null;
-  narrativeLog?: string | null;
-  privateGmNotes?: string | null;
-  highlights?: string[];
-};
-
-type ResourcePatchEvent = {
-  characterId: string;
-  resources: Record<string, string | number | boolean>;
-};
+type SessionProposalView = { id: string; status: 'OPEN' | 'DECIDED' | 'CANCELLED'; dates: string[]; decidedDate?: string | null };
+type DiceRollView = { id: string; formula: string; result: number; label?: string | null; breakdown?: { rolls?: number[] } | null };
 
 @Component({
   selector: 'app-campaign-tools',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    DiceResultComponent,
+    SystemBadgeComponent,
+    CampaignLogComponent,
+    CampaignResourcesComponent,
+  ],
   template: `
-    <div class="container tools-page" *ngIf="campaign">
-      <div class="tools-header">
-        <a class="back-link" [routerLink]="['/campaigns', campaign.id]">Voltar para campanha</a>
-        <h1>Ferramentas da Campanha</h1>
-        <p class="subtitle">{{ campaign.name }} � {{ campaign.systemTemplate?.name || campaign.system }}</p>
-        <div class="header-links">
-          <a class="btn btn-outline btn-sm" [routerLink]="['/campaigns', campaign.id, 'wiki']">Wiki</a>
-          <a class="btn btn-outline btn-sm" routerLink="/dice">Rolagens</a>
+    <section class="shell" *ngIf="campaign; else loadingState">
+      <header class="card header">
+        <div>
+          <a class="back" [routerLink]="['/campaigns', campaign.id]">Voltar para campanha</a>
+          <app-system-badge [system]="campaign.systemTemplate?.slug || campaign.system"></app-system-badge>
+          <h1>Ferramentas da Mesa</h1>
         </div>
-      </div>
-
-      <div class="card section-card" *ngIf="sessions.length > 0">
-        <div class="section-head">
-          <h2>Log Narrativo de Sess�es</h2>
-        </div>
-
-        <div class="session-selector">
-          <label for="session-select">Sess�o</label>
-          <select id="session-select" class="form-control" [(ngModel)]="selectedSessionId" (change)="syncLogEditor()">
-            <option *ngFor="let session of sessions" [value]="session.id">
-              {{ session.date | date:'dd/MM/yyyy' }} - {{ session.summary || 'Sem resumo' }}
-            </option>
-          </select>
-        </div>
-
-        <div class="tabs">
-          <button class="tab" [class.active]="activeLogTab === 'public'" (click)="activeLogTab = 'public'">
-            Narrativa P�blica
-          </button>
-          <button
-            class="tab"
-            *ngIf="canEditSessionLog"
-            [class.active]="activeLogTab === 'gm'"
-            (click)="activeLogTab = 'gm'"
-          >
-            Notas do GM
-          </button>
-        </div>
-
-        <div class="log-grid">
-          <div>
-            <label class="form-label" *ngIf="activeLogTab === 'public'">Narrativa</label>
-            <label class="form-label" *ngIf="activeLogTab === 'gm'">Notas Privadas do GM</label>
-            <textarea
-              class="form-control"
-              rows="10"
-              *ngIf="activeLogTab === 'public'"
-              [(ngModel)]="sessionLogForm.narrativeLog"
-              [readonly]="!canEditSessionLog"
-            ></textarea>
-            <textarea
-              class="form-control"
-              rows="10"
-              *ngIf="activeLogTab === 'gm'"
-              [(ngModel)]="sessionLogForm.privateGmNotes"
-              [readonly]="!canEditSessionLog"
-            ></textarea>
-
-            <label class="form-label">Highlights (separados por v�rgula)</label>
-            <input
-              class="form-control"
-              [(ngModel)]="sessionLogForm.highlightsInput"
-              [readonly]="!canEditSessionLog"
-            />
-          </div>
-
-          <div>
-            <div class="form-label">Preview</div>
-            <div class="preview-box" [innerHTML]="renderMarkdown(activeLogTab === 'public' ? sessionLogForm.narrativeLog : sessionLogForm.privateGmNotes)"></div>
-            <div class="highlight-preview" *ngIf="parsedHighlights.length > 0">
-              <h4>Highlights</h4>
-              <ul>
-                <li *ngFor="let highlight of parsedHighlights">{{ highlight }}</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div class="actions" *ngIf="canEditSessionLog">
-          <button class="btn btn-primary" (click)="saveSessionLog()" [disabled]="savingSessionLog">
-            {{ savingSessionLog ? 'Salvando...' : 'Salvar Log' }}
-          </button>
-        </div>
-      </div>
-
-      <div class="card section-card">
-        <div class="section-head">
-          <h2>Recursos de Personagem</h2>
-          <p>Atualiza��o autom�tica com debounce (500ms)</p>
-        </div>
-
-        <div class="resource-grid" *ngIf="characters.length > 0">
-          <div class="resource-card" *ngFor="let character of characters">
-            <div class="resource-title">
-              <strong>{{ character.name }}</strong>
-              <span>{{ character.class }}</span>
-            </div>
-
-            <div class="resource-fields" *ngIf="resourceDrafts[character.id] as draft">
-              <label>
-                HP
-                <input type="number" class="form-control" [ngModel]="draft['hp']" (ngModelChange)="onResourceChange(character.id, 'hp', $event)" />
-              </label>
-              <label>
-                Mana
-                <input type="number" class="form-control" [ngModel]="draft['mana']" (ngModelChange)="onResourceChange(character.id, 'mana', $event)" />
-              </label>
-              <label>
-                F�
-                <input type="number" class="form-control" [ngModel]="draft['faith']" (ngModelChange)="onResourceChange(character.id, 'faith', $event)" />
-              </label>
-              <label>
-                Sanidade
-                <input type="number" class="form-control" [ngModel]="draft['sanity']" (ngModelChange)="onResourceChange(character.id, 'sanity', $event)" />
-              </label>
-            </div>
-
-            <small class="save-state">{{ resourceSaveState[character.id] || 'Pronto' }}</small>
-          </div>
-        </div>
-      </div>
-
-      <div class="card section-card" *ngIf="campaign.systemTemplate?.hasSanity">
-        <div class="section-head">
-          <h2>Sanidade (Call of Cthulhu)</h2>
-        </div>
-
-        <div class="form-grid">
-          <select class="form-control" [(ngModel)]="sanityForm.characterId" (change)="loadSanityEvents()">
-            <option value="" disabled>Selecione um personagem</option>
-            <option *ngFor="let character of characters" [value]="character.id">{{ character.name }}</option>
-          </select>
-          <input class="form-control" type="number" [(ngModel)]="sanityForm.roll" placeholder="Rolagem" />
-          <input class="form-control" type="number" [(ngModel)]="sanityForm.difficulty" placeholder="Dificuldade" />
-          <input class="form-control" [(ngModel)]="sanityForm.trigger" placeholder="Gatilho" />
-          <input class="form-control" type="number" [(ngModel)]="sanityForm.successLoss" placeholder="Perda (sucesso)" />
-          <input class="form-control" type="number" [(ngModel)]="sanityForm.failedLoss" placeholder="Perda (falha)" />
-          <select class="form-control" [(ngModel)]="sanityForm.sessionId">
-            <option value="">Sem sess�o</option>
-            <option *ngFor="let session of sessions" [value]="session.id">{{ session.date | date:'dd/MM/yyyy' }}</option>
-          </select>
-        </div>
-
         <div class="actions">
-          <button class="btn btn-primary" (click)="runSanityCheck()" [disabled]="runningSanityCheck || !sanityForm.characterId || !sanityForm.trigger">
-            {{ runningSanityCheck ? 'Executando...' : 'Executar Sanity Check' }}
-          </button>
+          <a class="btn btn-outline" [routerLink]="['/campaigns', campaign.id, 'wiki']">Wiki</a>
+          <a class="btn btn-outline" routerLink="/dice">Dados</a>
         </div>
+      </header>
 
-        <div class="events-list" *ngIf="sanityEvents.length > 0">
-          <h4>�ltimos eventos</h4>
-          <div class="event-item" *ngFor="let event of sanityEvents">
-            <strong>{{ event.trigger }}</strong>
-            <span>Perda: {{ event.sanityLost }}</span>
-            <span *ngIf="event.tempInsanity">Temp: {{ event.tempInsanity }}</span>
-            <span *ngIf="event.permInsanity">Perm: {{ event.permInsanity }}</span>
+      <div class="grid">
+        <!-- Log Narrativo -->
+        <app-campaign-log
+          [sessions]="sessions"
+          [campaign]="campaign"
+          (sessionSelected)="onSessionSelected($event)"
+        />
+
+        <!-- Recursos dos Personagens -->
+        <app-campaign-resources
+          [characters]="characters"
+          [campaignId]="campaignId"
+          [showMana]="campaign.systemTemplate?.hasMana ?? true"
+          [showSanity]="campaign.systemTemplate?.hasSanity ?? false"
+        />
+
+        <!-- Tracker de Combate -->
+        <article class="card panel">
+          <h2>Tracker de Combate</h2>
+          <div class="form-grid compact">
+            <select class="form-control" [(ngModel)]="selectedEncounterId" (change)="setSelectedEncounter()">
+              <option value="">Selecione um encontro</option>
+              <option *ngFor="let encounter of encounters" [value]="encounter.id">{{ encounter.name }}</option>
+            </select>
+            <button class="btn btn-primary btn-sm" (click)="advanceTurn()" [disabled]="!selectedEncounterId || advancingTurn">Proximo turno</button>
           </div>
-        </div>
-      </div>
-
-      <div class="card section-card" *ngIf="campaign.systemTemplate?.hasMana">
-        <div class="section-head">
-          <h2>Mana e Pontos de F� (Tormenta20)</h2>
-        </div>
-
-        <div class="form-grid">
-          <select class="form-control" [(ngModel)]="spellForm.characterId" (change)="loadSpellCasts()">
-            <option value="" disabled>Selecione um personagem</option>
-            <option *ngFor="let character of characters" [value]="character.id">{{ character.name }}</option>
-          </select>
-          <input class="form-control" [(ngModel)]="spellForm.spellName" placeholder="Nome da magia" />
-          <input class="form-control" type="number" [(ngModel)]="spellForm.manaCost" placeholder="Custo de mana" />
-          <input class="form-control" type="number" [(ngModel)]="spellForm.faithCost" placeholder="Custo de f�" />
-          <input class="form-control" [(ngModel)]="spellForm.result" placeholder="Resultado (opcional)" />
-          <select class="form-control" [(ngModel)]="spellForm.sessionId">
-            <option value="">Sem sess�o</option>
-            <option *ngFor="let session of sessions" [value]="session.id">{{ session.date | date:'dd/MM/yyyy' }}</option>
-          </select>
-        </div>
-
-        <div class="actions">
-          <button class="btn btn-primary" (click)="castSpell()" [disabled]="castingSpell || !spellForm.characterId || !spellForm.spellName">
-            {{ castingSpell ? 'Conjurando...' : 'Registrar Conjura��o' }}
-          </button>
-        </div>
-
-        <div class="events-list" *ngIf="spellCasts.length > 0">
-          <h4>�ltimas conjura��es</h4>
-          <div class="event-item" *ngFor="let cast of spellCasts">
-            <strong>{{ cast.spellName }}</strong>
-            <span>Mana: {{ cast.manaCost }}</span>
-            <span>F�: {{ cast.faithCost }}</span>
-            <span *ngIf="cast.result">{{ cast.result }}</span>
+          <div class="combat-list" *ngIf="selectedEncounter">
+            <div class="combat-item" *ngFor="let combatant of selectedEncounter.combatants; let i = index" [class.active]="i === selectedEncounter.currentTurn">
+              <div><strong>{{ combatant.name }}</strong><small>Init {{ combatant.initiative }}</small></div>
+              <div class="inline"><input class="form-control hp" type="number" [ngModel]="combatant.hp" (ngModelChange)="updateCombatantHp(combatant.id, $event)" /><span>/ {{ combatant.maxHp }}</span></div>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
+        </article>
 
-    <div class="loading" *ngIf="loading">
-      <div class="spinner"></div>
-    </div>
+        <!-- Compendio -->
+        <article class="card panel">
+          <h2>Compendio</h2>
+          <input class="form-control" [(ngModel)]="creatureSearch" (ngModelChange)="filterCreatures()" placeholder="Buscar criatura" />
+          <div class="combat-list">
+            <button class="combat-item click" *ngFor="let creature of filteredCreatures" (click)="addCreatureToEncounter(creature)" [disabled]="!selectedEncounterId">
+              <div><strong>{{ creature.name }}</strong><small>{{ creature.creatureType }} · XP {{ creature.xpReward || 0 }}</small></div>
+              <span>Adicionar</span>
+            </button>
+          </div>
+        </article>
+
+        <!-- Votacao de Datas -->
+        <article class="card panel">
+          <h2>Votacao de Datas</h2>
+          <div class="form-grid">
+            <input class="form-control" type="datetime-local" [(ngModel)]="proposalDates[0]" />
+            <input class="form-control" type="datetime-local" [(ngModel)]="proposalDates[1]" />
+            <input class="form-control" type="datetime-local" [(ngModel)]="proposalDates[2]" />
+          </div>
+          <button class="btn btn-outline btn-sm" (click)="createProposal()" [disabled]="creatingProposal">Criar proposta</button>
+          <div class="box" *ngFor="let proposal of proposals">
+            <strong>{{ proposal.status }}</strong>
+            <div class="chips">
+              <button class="chip-button" *ngFor="let date of proposal.dates" (click)="voteProposal(proposal.id, date)">
+                {{ date | date:'dd/MM HH:mm' }}
+              </button>
+            </div>
+            <div class="chips" *ngIf="isGm && proposal.status === 'OPEN'">
+              <button class="chip-button gm" *ngFor="let date of proposal.dates" (click)="decideProposal(proposal.id, date)">Confirmar {{ date | date:'dd/MM HH:mm' }}</button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Feed ao Vivo -->
+        <article class="card panel">
+          <h2>Feed ao Vivo</h2>
+          <div class="feed"><app-dice-result *ngFor="let roll of liveRolls" [roll]="roll"></app-dice-result></div>
+        </article>
+      </div>
+    </section>
+
+    <ng-template #loadingState><div class="loading"><div class="spinner"></div></div></ng-template>
   `,
   styles: [
     `
-      .tools-page {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-      }
-      .tools-header {
-        margin-bottom: 1.5rem;
-      }
-      .subtitle {
-        color: var(--text-secondary);
-        margin-top: 0.25rem;
-      }
-      .back-link {
-        color: var(--text-secondary);
-        text-decoration: none;
-        font-size: 0.85rem;
-      }
-      .back-link:hover {
-        color: var(--accent-primary);
-      }
-      .header-links {
-        margin-top: 0.75rem;
-        display: flex;
-        gap: 0.5rem;
-      }
-      .section-card {
-        margin-bottom: 1rem;
-      }
-      .section-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 0.75rem;
-      }
-      .section-head p {
-        margin: 0;
-        color: var(--text-secondary);
-        font-size: 0.8rem;
-      }
-      .session-selector {
-        margin-bottom: 0.75rem;
-      }
-      .session-selector label {
-        display: block;
-        margin-bottom: 0.25rem;
-        font-size: 0.8rem;
-        color: var(--text-secondary);
-      }
-      .tabs {
-        display: flex;
-        gap: 0.35rem;
-        margin-bottom: 0.75rem;
-      }
-      .tab {
-        background: var(--bg-secondary);
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius-sm);
-        color: var(--text-secondary);
-        padding: 0.45rem 0.75rem;
-        cursor: pointer;
-      }
-      .tab.active {
-        color: var(--accent-primary);
-        border-color: var(--accent-primary);
-      }
-      .log-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.75rem;
-      }
-      .preview-box {
-        min-height: 220px;
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius-sm);
-        padding: 0.75rem;
-        background: rgba(255, 255, 255, 0.02);
-        white-space: pre-wrap;
-      }
-      .highlight-preview {
-        margin-top: 0.75rem;
-      }
-      .highlight-preview ul {
-        margin: 0.35rem 0 0;
-        padding-left: 1rem;
-      }
-      .resource-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 0.75rem;
-      }
-      .resource-card {
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius-md);
-        padding: 0.75rem;
-      }
-      .resource-title {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 0.5rem;
-      }
-      .resource-title span {
-        color: var(--text-secondary);
-        font-size: 0.8rem;
-      }
-      .resource-fields {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.5rem;
-      }
-      .resource-fields label {
-        font-size: 0.75rem;
-        color: var(--text-secondary);
-      }
-      .save-state {
-        display: block;
-        margin-top: 0.5rem;
-        color: var(--text-muted);
-      }
-      .form-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: 0.6rem;
-      }
-      .actions {
-        margin-top: 0.75rem;
-      }
-      .events-list {
-        margin-top: 1rem;
-      }
-      .events-list h4 {
-        margin-bottom: 0.5rem;
-      }
-      .event-item {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.75rem;
-        padding: 0.45rem 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        font-size: 0.85rem;
-      }
-      @media (max-width: 960px) {
-        .log-grid {
-          grid-template-columns: 1fr;
-        }
-      }
+      .shell { width: min(1280px, calc(100% - 2rem)); margin: 0 auto; padding: 1.5rem 0 3rem; }
+      .header { display: flex; justify-content: space-between; gap: 1rem; padding: 1.2rem; margin-bottom: 1rem; }
+      .header h1, .panel h2 { margin: 0.7rem 0; }
+      .back { color: var(--text-secondary); text-decoration: none; }
+      .actions { display: flex; gap: 0.6rem; align-content: start; flex-wrap: wrap; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+      .panel { padding: 1rem; display: grid; gap: 0.75rem; }
+      .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.6rem; }
+      .form-grid.compact { grid-template-columns: 1fr auto; }
+      .box { padding: 0.8rem; border-radius: 1rem; background: rgba(255,255,255,0.04); display: grid; gap: 0.45rem; }
+      .combat-list, .feed { display: grid; gap: 0.6rem; }
+      .combat-item { display: flex; justify-content: space-between; gap: 0.8rem; padding: 0.75rem; border: 1px solid rgba(255,255,255,0.08); border-radius: 1rem; background: rgba(255,255,255,0.03); color: var(--text-primary); }
+      .combat-item.active { border-color: rgba(201,168,76,0.4); }
+      .combat-item.click { cursor: pointer; text-align: left; }
+      .inline { display: flex; align-items: center; gap: 0.4rem; }
+      .hp { width: 5rem; }
+      .chips { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+      .chips span, .chip-button { padding: 0.35rem 0.65rem; border-radius: 999px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: var(--text-primary); }
+      .chip-button { cursor: pointer; }
+      .chip-button.gm { border-color: rgba(201,168,76,0.4); }
+      small, span { color: var(--text-secondary); }
+      @media (max-width: 980px) { .grid, .form-grid.compact { grid-template-columns: 1fr; } .header { flex-direction: column; } }
     `,
   ],
 })
 export class CampaignToolsComponent implements OnInit, OnDestroy {
-  loading = true;
-
+  campaignId = '';
   campaign: CampaignView | null = null;
   characters: CharacterView[] = [];
   sessions: SessionView[] = [];
-
+  creatures: CreatureView[] = [];
+  filteredCreatures: CreatureView[] = [];
+  encounters: CombatEncounterView[] = [];
+  proposals: SessionProposalView[] = [];
+  liveRolls: DiceRollView[] = [];
   selectedSessionId = '';
-  activeLogTab: 'public' | 'gm' = 'public';
-  sessionLogForm = {
-    narrativeLog: '',
-    privateGmNotes: '',
-    highlightsInput: '',
-  };
-  savingSessionLog = false;
-
-  sanityForm = {
-    characterId: '',
-    roll: 50,
-    difficulty: 50,
-    trigger: '',
-    successLoss: 0,
-    failedLoss: 1,
-    sessionId: '',
-  };
-  runningSanityCheck = false;
-  sanityEvents: Array<{
-    id: string;
-    trigger: string;
-    sanityLost: number;
-    tempInsanity: string | null;
-    permInsanity: string | null;
-  }> = [];
-
-  spellForm = {
-    characterId: '',
-    spellName: '',
-    manaCost: 0,
-    faithCost: 0,
-    result: '',
-    sessionId: '',
-  };
-  castingSpell = false;
-  spellCasts: Array<{
-    id: string;
-    spellName: string;
-    manaCost: number;
-    faithCost: number;
-    result: string | null;
-  }> = [];
-
-  resourceDrafts: Record<string, Record<string, string>> = {};
-  resourceSaveState: Record<string, string> = {};
+  selectedEncounterId = '';
+  selectedEncounter: CombatEncounterView | null = null;
+  creatureSearch = '';
+  advancingTurn = false;
+  creatingProposal = false;
+  proposalDates = ['', '', ''];
 
   private readonly destroy$ = new Subject<void>();
-  private readonly resourcePatch$ = new Subject<ResourcePatchEvent>();
 
   constructor(
     private readonly route: ActivatedRoute,
     private readonly authService: AuthService,
     private readonly campaignService: CampaignService,
     private readonly characterService: CharacterService,
-    private readonly sessionService: SessionService
+    private readonly sessionService: SessionService,
+    private readonly combatService: CombatService,
+    private readonly creatureService: CreatureService,
+    private readonly proposalService: SessionProposalService,
+    private readonly diceRollService: DiceRollService,
+    private readonly socketService: SocketService
   ) {}
 
-  get canEditSessionLog(): boolean {
-    const campaign = this.campaign;
-    const currentUser = this.authService.currentUser;
-
-    if (!campaign || !currentUser) {
-      return false;
-    }
-
-    if (campaign.ownerId === currentUser.id) {
-      return true;
-    }
-
-    return campaign.members.some((member) => member.user.id === currentUser.id && member.role === 'GM');
-  }
-
-  get parsedHighlights(): string[] {
-    return this.sessionLogForm.highlightsInput
-      .split(',')
-      .map((value) => value.trim())
-      .filter((value) => value.length > 0);
+  get isGm(): boolean {
+    const user = this.authService.currentUser;
+    return !!(
+      user &&
+      this.campaign &&
+      (this.campaign.ownerId === user.id ||
+        this.campaign.members.some((m) => m.user.id === user.id && m.role === 'GM'))
+    );
   }
 
   ngOnInit(): void {
-    this.resourcePatch$
-      .pipe(
-        debounceTime(500),
-        switchMap((payload) => {
-          this.resourceSaveState[payload.characterId] = 'Salvando...';
-          return this.characterService.updateResources(payload.characterId, payload.resources).pipe(
-            catchError(() => {
-              this.resourceSaveState[payload.characterId] = 'Falha ao salvar';
-              return of(null);
-            })
-          );
-        }),
-        takeUntil(this.destroy$)
-      )
-      .subscribe((response) => {
-        if (!response?.data) {
-          return;
-        }
+    this.campaignId = this.route.snapshot.paramMap.get('id') || '';
+    if (!this.campaignId) return;
 
-        const character = this.characters.find((item) => item.id === response.data.id);
-        if (!character) {
-          return;
-        }
-
-        character.resources = response.data.resources as ResourceMap;
-        this.initResourceDraft(character);
-        this.resourceSaveState[character.id] = 'Sincronizado';
-      });
-
-    this.loadData();
+    forkJoin({
+      campaign: this.campaignService.getCampaignById(this.campaignId),
+      characters: this.characterService.getCharactersByCampaign(this.campaignId),
+      sessions: this.sessionService.getSessionsByCampaign(this.campaignId),
+      proposals: this.proposalService.listByCampaign(this.campaignId),
+      rolls: this.diceRollService.getCampaignRolls(this.campaignId, { limit: 6 }),
+    }).subscribe({
+      next: ({ campaign, characters, sessions, proposals, rolls }) => {
+        this.campaign = campaign.data as CampaignView;
+        this.characters = (characters.data || []) as CharacterView[];
+        this.sessions = (sessions.data || []) as SessionView[];
+        this.proposals = (proposals.data || []) as SessionProposalView[];
+        this.liveRolls = (rolls.data || []) as DiceRollView[];
+        this.loadCreatures();
+        this.bindRealtime();
+      },
+    });
   }
 
   ngOnDestroy(): void {
+    if (this.campaignId) this.socketService.leaveCampaign(this.campaignId);
     this.destroy$.next();
     this.destroy$.complete();
   }
 
-  private loadData(): void {
-    const campaignId = this.route.snapshot.paramMap.get('id');
-    if (!campaignId) {
-      this.loading = false;
+  onSessionSelected(sessionId: string): void {
+    this.selectedSessionId = sessionId;
+    this.loadEncounters();
+  }
+
+  private bindRealtime(): void {
+    this.socketService.joinCampaign(this.campaignId);
+    this.socketService
+      .on<DiceRollView>('dice:rolled')
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((roll) => {
+        this.liveRolls = [roll, ...this.liveRolls].slice(0, 6);
+      });
+    this.socketService
+      .on<CombatEncounterView>('combat:created')
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => this.loadEncounters());
+    this.socketService
+      .on<{ encounterId: string }>('combat:turn_changed')
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => this.loadEncounters());
+  }
+
+  loadEncounters(): void {
+    if (!this.selectedSessionId) {
+      this.encounters = [];
+      this.selectedEncounter = null;
       return;
     }
+    this.combatService.listSessionEncounters(this.selectedSessionId).subscribe({
+      next: (response) => {
+        this.encounters = (response.data || []) as CombatEncounterView[];
+        this.setSelectedEncounter();
+      },
+    });
+  }
 
-    this.loading = true;
-    forkJoin({
-      campaign: this.campaignService.getCampaignById(campaignId),
-      characters: this.characterService.getCharactersByCampaign(campaignId),
-      sessions: this.sessionService.getSessionsByCampaign(campaignId),
-    }).subscribe({
-      next: ({ campaign, characters, sessions }) => {
-        this.campaign = campaign.data as CampaignView;
-        this.characters = (characters.data || []) as CharacterView[];
-        this.sessions = (sessions.data || []) as SessionView[];
+  setSelectedEncounter(): void {
+    this.selectedEncounter =
+      this.encounters.find((e) => e.id === this.selectedEncounterId) || this.encounters[0] || null;
+    if (this.selectedEncounter) this.selectedEncounterId = this.selectedEncounter.id;
+  }
 
-        this.characters.forEach((character) => this.initResourceDraft(character));
-
-        if (this.sessions.length > 0) {
-          this.selectedSessionId = this.sessions[0].id;
-          this.syncLogEditor();
-        }
-
-        if (this.characters.length > 0) {
-          const firstCharacterId = this.characters[0].id;
-          this.sanityForm.characterId = firstCharacterId;
-          this.spellForm.characterId = firstCharacterId;
-          void this.loadSanityEvents();
-          void this.loadSpellCasts();
-        }
-
-        this.loading = false;
+  advanceTurn(): void {
+    if (!this.selectedEncounterId) return;
+    this.advancingTurn = true;
+    this.combatService.nextTurn(this.selectedEncounterId).subscribe({
+      next: (response) => {
+        this.selectedEncounter = response.data as CombatEncounterView;
+        this.advancingTurn = false;
       },
       error: () => {
-        this.loading = false;
+        this.advancingTurn = false;
       },
     });
   }
 
-  private initResourceDraft(character: CharacterView): void {
-    const resources = character.resources || {};
-
-    const pickValue = (key: string): string => {
-      const value = resources[key];
-      if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'string') {
-        return String(value);
-      }
-      return '0';
-    };
-
-    this.resourceDrafts[character.id] = {
-      hp: pickValue('hp'),
-      mana: pickValue('mana'),
-      faith: pickValue('faith'),
-      sanity: pickValue('sanity'),
-    };
+  loadCreatures(): void {
+    if (!this.campaign?.systemTemplate?.id) return;
+    this.creatureService
+      .list({ systemId: this.campaign.systemTemplate.id, includePrivate: true })
+      .subscribe({
+        next: (response) => {
+          this.creatures = (response.data || []) as CreatureView[];
+          this.filterCreatures();
+        },
+      });
   }
 
-  onResourceChange(characterId: string, key: string, rawValue: string): void {
-    const draft = this.resourceDrafts[characterId];
-    if (!draft) {
-      return;
-    }
+  filterCreatures(): void {
+    const term = this.creatureSearch.trim().toLowerCase();
+    this.filteredCreatures = this.creatures.filter(
+      (c) =>
+        !term || c.name.toLowerCase().includes(term) || c.creatureType.toLowerCase().includes(term)
+    );
+  }
 
-    draft[key] = rawValue;
+  addCreatureToEncounter(creature: CreatureView): void {
+    if (!this.selectedEncounterId) return;
+    this.combatService
+      .addCombatant(this.selectedEncounterId, {
+        name: creature.name,
+        initiative: this.extractStatNumber(creature.stats, 'DEX', 10),
+        hp: this.extractStatNumber(creature.stats, 'hp', 10),
+        maxHp: this.extractStatNumber(creature.stats, 'hp', 10),
+        isNpc: true,
+      })
+      .subscribe({ next: () => this.loadEncounters() });
+  }
 
-    const numeric = Number(rawValue);
-    const parsedValue = Number.isFinite(numeric) ? numeric : rawValue;
+  updateCombatantHp(combatantId: string, rawValue: string): void {
+    if (!this.selectedEncounterId) return;
+    const hp = Number(rawValue);
+    if (!Number.isFinite(hp)) return;
+    this.combatService.updateCombatant(this.selectedEncounterId, combatantId, { hp }).subscribe();
+  }
 
-    this.resourcePatch$.next({
-      characterId,
-      resources: {
-        [key]: parsedValue,
+  createProposal(): void {
+    const dates = this.proposalDates.filter(Boolean);
+    if (dates.length < 3) return;
+    this.creatingProposal = true;
+    this.proposalService.create(this.campaignId, dates).subscribe({
+      next: () => {
+        this.creatingProposal = false;
+        this.reloadProposals();
+        this.proposalDates = ['', '', ''];
+      },
+      error: () => {
+        this.creatingProposal = false;
       },
     });
   }
 
-  syncLogEditor(): void {
-    const session = this.sessions.find((item) => item.id === this.selectedSessionId);
-    if (!session) {
-      return;
-    }
-
-    this.sessionLogForm = {
-      narrativeLog: session.narrativeLog || '',
-      privateGmNotes: session.privateGmNotes || '',
-      highlightsInput: (session.highlights || []).join(', '),
-    };
-  }
-
-  saveSessionLog(): void {
-    if (!this.selectedSessionId) {
-      return;
-    }
-
-    this.savingSessionLog = true;
-    this.sessionService
-      .updateSessionLog(this.selectedSessionId, {
-        narrativeLog: this.sessionLogForm.narrativeLog || undefined,
-        privateGmNotes: this.sessionLogForm.privateGmNotes || undefined,
-        highlights: this.parsedHighlights,
-      })
-      .subscribe({
-        next: (response) => {
-          const updated = response.data as SessionView;
-          const index = this.sessions.findIndex((item) => item.id === updated.id);
-          if (index >= 0) {
-            this.sessions[index] = {
-              ...this.sessions[index],
-              ...updated,
-            };
-          }
-          this.syncLogEditor();
-          this.savingSessionLog = false;
-        },
-        error: () => {
-          this.savingSessionLog = false;
-        },
-      });
-  }
-
-  runSanityCheck(): void {
-    const characterId = this.sanityForm.characterId;
-    if (!characterId || !this.sanityForm.trigger.trim()) {
-      return;
-    }
-
-    this.runningSanityCheck = true;
-    this.characterService
-      .sanityCheck(characterId, {
-        roll: this.sanityForm.roll,
-        difficulty: this.sanityForm.difficulty,
-        trigger: this.sanityForm.trigger,
-        sessionId: this.sanityForm.sessionId || undefined,
-        successLoss: this.sanityForm.successLoss,
-        failedLoss: this.sanityForm.failedLoss,
-      })
-      .subscribe({
-        next: (response) => {
-          const payload = response.data as { character?: CharacterView };
-          const updatedCharacter = payload.character;
-          if (updatedCharacter?.id) {
-            const character = this.characters.find((item) => item.id === updatedCharacter.id);
-            if (character) {
-              character.resources = updatedCharacter.resources;
-              this.initResourceDraft(character);
-            }
-          }
-
-          this.sanityForm.trigger = '';
-          this.runningSanityCheck = false;
-          void this.loadSanityEvents();
-        },
-        error: () => {
-          this.runningSanityCheck = false;
-        },
-      });
-  }
-
-  castSpell(): void {
-    const characterId = this.spellForm.characterId;
-    if (!characterId || !this.spellForm.spellName.trim()) {
-      return;
-    }
-
-    this.castingSpell = true;
-    this.characterService
-      .castSpell(characterId, {
-        spellName: this.spellForm.spellName,
-        manaCost: this.spellForm.manaCost,
-        faithCost: this.spellForm.faithCost,
-        result: this.spellForm.result || undefined,
-        sessionId: this.spellForm.sessionId || undefined,
-      })
-      .subscribe({
-        next: (response) => {
-          const payload = response.data as { character?: CharacterView };
-          const updatedCharacter = payload.character;
-          if (updatedCharacter?.id) {
-            const character = this.characters.find((item) => item.id === updatedCharacter.id);
-            if (character) {
-              character.resources = updatedCharacter.resources;
-              this.initResourceDraft(character);
-            }
-          }
-
-          this.spellForm.spellName = '';
-          this.spellForm.result = '';
-          this.castingSpell = false;
-          void this.loadSpellCasts();
-        },
-        error: () => {
-          this.castingSpell = false;
-        },
-      });
-  }
-
-  loadSanityEvents(): Promise<void> {
-    if (!this.sanityForm.characterId) {
-      this.sanityEvents = [];
-      return Promise.resolve();
-    }
-
-    return new Promise((resolve) => {
-      this.characterService.getSanityEvents(this.sanityForm.characterId).subscribe({
-        next: (response) => {
-          this.sanityEvents = (response.data || []) as Array<{
-            id: string;
-            trigger: string;
-            sanityLost: number;
-            tempInsanity: string | null;
-            permInsanity: string | null;
-          }>;
-          resolve();
-        },
-        error: () => {
-          this.sanityEvents = [];
-          resolve();
-        },
-      });
+  voteProposal(proposalId: string, date: string): void {
+    this.proposalService.vote(proposalId, { date, available: true }).subscribe({
+      next: () => this.reloadProposals(),
     });
   }
 
-  loadSpellCasts(): Promise<void> {
-    if (!this.spellForm.characterId) {
-      this.spellCasts = [];
-      return Promise.resolve();
-    }
-
-    return new Promise((resolve) => {
-      this.characterService.getSpellCasts(this.spellForm.characterId).subscribe({
-        next: (response) => {
-          this.spellCasts = (response.data || []) as Array<{
-            id: string;
-            spellName: string;
-            manaCost: number;
-            faithCost: number;
-            result: string | null;
-          }>;
-          resolve();
-        },
-        error: () => {
-          this.spellCasts = [];
-          resolve();
-        },
-      });
+  decideProposal(proposalId: string, date: string): void {
+    this.proposalService.decide(proposalId, date).subscribe({
+      next: () => this.reloadProposals(),
     });
   }
 
-  renderMarkdown(markdown: string): string {
-    const escaped = markdown
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+  private reloadProposals(): void {
+    this.proposalService.listByCampaign(this.campaignId).subscribe({
+      next: (response) => {
+        this.proposals = (response.data || []) as SessionProposalView[];
+      },
+    });
+  }
 
-    return escaped
-      .replace(/^### (.*)$/gm, '<h3>$1</h3>')
-      .replace(/^## (.*)$/gm, '<h2>$1</h2>')
-      .replace(/^# (.*)$/gm, '<h1>$1</h1>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/^\- (.*)$/gm, '<li>$1</li>')
-      .replace(/\n/g, '<br/>');
+  private extractStatNumber(
+    stats: Record<string, unknown> | null | undefined,
+    key: string,
+    fallback: number
+  ): number {
+    if (!stats) return fallback;
+    if (typeof stats[key] === 'number') return Number(stats[key]);
+    const attrs =
+      stats['attributes'] && typeof stats['attributes'] === 'object' && !Array.isArray(stats['attributes'])
+        ? (stats['attributes'] as Record<string, unknown>)
+        : null;
+    return attrs && typeof attrs[key] === 'number' ? Number(attrs[key]) : fallback;
   }
 }

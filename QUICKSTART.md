@@ -42,8 +42,43 @@ Expected migration order:
 - `20260320110000_initial_schema`
 - `20260320120000_security_hardening`
 - `20260320143000_phase3_multisystem`
+- `20260321003703_phase7_combat_creatures_proposals`
 
 In clean environments, use `prisma migrate deploy`.
+
+## Environment Variables (new in Phase 4+)
+
+Add to `backend/.env`:
+```bash
+REDIS_URL=redis://localhost:6379
+METRICS_TOKEN=your-metrics-secret-token
+LOG_LEVEL=info
+```
+
+## Docker Services
+
+| Service | Port | Description |
+|---------|------|-------------|
+| PostgreSQL | 5432 | Database |
+| Redis | 6379 | Cache + sessions |
+| Backend | 3000 | API + WebSockets |
+| Frontend | 80 | Angular app |
+| Prometheus | 9090 | Metrics |
+| Grafana | 3001 | Dashboards |
+
+## Phase 7 routes (Combat, Creatures, Proposals)
+
+- `POST /api/sessions/:sessionId/combat` - Create combat encounter
+- `GET /api/sessions/:sessionId/combat` - List encounters
+- `PATCH /api/combat/:encounterId/next-turn` - Advance turn
+- `POST /api/combat/:encounterId/combatants` - Add combatant
+- `PATCH /api/combat/:encounterId/combatants/:id` - Update combatant
+- `DELETE /api/combat/:encounterId/combatants/:id` - Remove combatant
+- `GET /api/creatures` - List creature compendium
+- `POST /api/campaigns/:campaignId/session-proposals` - Create proposal
+- `POST /api/session-proposals/:id/votes` - Vote on date
+- `PATCH /api/session-proposals/:id/decide` - Confirm date (GM)
+- `PATCH /api/session-proposals/:id/cancel` - Cancel proposal (GM)
 
 ## Phase 3 routes (quick check)
 
@@ -59,6 +94,9 @@ In clean environments, use `prisma migrate deploy`.
 
 - `http://localhost/campaigns/:id/wiki`
 - `http://localhost/campaigns/:id/tools`
+- `http://localhost/campaigns/:id/combat`
+- `http://localhost/campaigns/:id/compendium`
+- `http://localhost/campaigns/:id/schedule`
 - `http://localhost/dice`
 
 ## Troubleshooting
