@@ -75,10 +75,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Suporte a links internos `@Pagina` com resolucao de backlinks
 - Nova tela da wiki de campanha com arvore lateral, criacao de subpagina e painel de referencias
 - Testes de integracao para fluxo de wiki (hierarquia, ciclo, idempotencia e permissao GM)
+- Mesa Online (VTT Beta) por campanha com mapa por URL, grade configuravel e tokens arrastaveis
+- Sincronizacao realtime da mesa via Socket.IO com eventos de request/update/state
 
 ### Changed
 - Modelo Prisma `wiki_pages` expandido com `parent_page_id` e `legacy_source`
 - Documentacao principal atualizada com rotas e fluxo da wiki viva
+- Home da campanha agora destaca acesso rapido para `Mesa Online (VTT Beta)`
 
 ### Planned Features
 - WebSocket support for real-time collaboration

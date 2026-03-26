@@ -140,6 +140,21 @@ O dashboard mostra:
    - Paginas citadas por ela
    - Backlinks (quem cita essa pagina)
 
+### 🗺️ Mesa Online (VTT Beta)
+
+**Abrir e sincronizar a mesa:**
+1. Entre em uma campanha
+2. Clique em **Mesa Online (VTT Beta)** no topo da tela
+3. A rota principal da mesa e `/campaigns/:id/tabletop`
+4. Em duas abas diferentes, abra a mesma campanha para validar sincronizacao em tempo real
+
+**Recursos atuais:**
+- Definicao de imagem de mapa por URL
+- Grade configuravel (24 a 120 px)
+- Criacao, remocao e edicao de tokens
+- Drag and drop de tokens no palco da mesa
+- Propagacao em tempo real para membros conectados na campanha
+
 ## 🎯 Cenários de Uso
 
 ### Scenario 1: Novo Mestre de Jogo
@@ -303,6 +318,13 @@ DELETE /api/wiki/:wikiPageId                    - Remover pagina wiki
 GET   /api/notifications      - Listar notificações
 GET   /api/notifications/:id  - Ver notificação
 PATCH /api/notifications/:id  - Marcar como lida
+```
+
+### Realtime (Socket.IO) - Mesa Online
+```
+campaign:tabletop:request  - Solicita estado atual da mesa da campanha
+campaign:tabletop:update   - Atualiza mapa, grade e tokens da mesa
+campaign:tabletop:state    - Broadcast do estado consolidado da mesa
 ```
 
 ## 🐛 Troubleshooting

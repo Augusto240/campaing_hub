@@ -52,6 +52,11 @@ export class SocketService implements OnDestroy {
     });
   }
 
+  emit<TPayload>(event: string, payload: TPayload): void {
+    this.connect();
+    this.socket?.emit(event, payload);
+  }
+
   ngOnDestroy(): void {
     this.disconnect();
   }

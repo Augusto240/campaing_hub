@@ -96,11 +96,18 @@ LOG_LEVEL=info
 ## Frontend routes (quick check)
 
 - `http://localhost/campaigns/:id/wiki`
+- `http://localhost/campaigns/:id/tabletop`
 - `http://localhost/campaigns/:id/tools`
 - `http://localhost/campaigns/:id/combat`
 - `http://localhost/campaigns/:id/compendium`
 - `http://localhost/campaigns/:id/schedule`
 - `http://localhost/dice`
+
+## Realtime events (Tabletop beta)
+
+- `campaign:tabletop:request`
+- `campaign:tabletop:update`
+- `campaign:tabletop:state`
 
 ## Troubleshooting
 

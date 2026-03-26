@@ -58,6 +58,7 @@ Três anos depois, evoluiu para uma **plataforma completa e moderna** com autent
 - **Engine Multi-Sistema** — Templates de regras para D&D 5e, PF2e, CoC 7e e Tormenta20
 - **Wiki de Campanha** — Páginas markdown com categorias, tags e visibilidade pública/GM
 - **Wiki Hierárquica + Legado 2023** — Arvore de paginas com pai/filhos, importacao canonica de Augustus/Satoru/galeria/4d6, links internos `@Pagina` e backlinks
+- **Mesa Online (VTT Beta)** — Mapa por URL, grade configuravel, tokens arrastaveis e sincronizacao realtime por campanha (WebSocket)
 - **Histórico Persistido de Rolagens** — Fórmulas com `kh/kl`, `advantage/disadvantage` e modificador por atributo
 - **Sanidade e Mana** — Fluxos específicos para CoC (sanity check) e Tormenta20 (spell cast + fé)
 
@@ -349,6 +350,19 @@ ng serve                   # Inicia na porta 4200
 4. Crie subpaginas pela arvore lateral e use `@Nome da Pagina` no conteudo para gerar links internos e backlinks.
 
 Guia tecnico detalhado: `WIKI_LEGADO_E_HIERARQUIA.md`.
+
+### Mesa Online (VTT Beta): como usar
+
+1. Entre em uma campanha e clique em **Mesa Online (VTT Beta)** na home da campanha.
+2. Acesse `/campaigns/:id/tabletop`.
+3. Defina uma URL de mapa (opcional) e ajuste o tamanho da grade.
+4. Crie tokens, renomeie, ajuste cor/tamanho e arraste no mapa.
+5. Abra a mesma campanha em outra aba para validar sincronizacao em tempo real.
+
+Eventos Socket.IO usados no VTT beta:
+- `campaign:tabletop:request`
+- `campaign:tabletop:update`
+- `campaign:tabletop:state`
 
 ---
 

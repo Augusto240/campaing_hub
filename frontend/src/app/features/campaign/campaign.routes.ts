@@ -10,6 +10,10 @@ export const CAMPAIGN_ROUTES: Routes = [
     loadComponent: () => import('./campaign-wiki/campaign-wiki.component').then(m => m.CampaignWikiComponent)
   },
   {
+    path: ':id/tabletop',
+    loadComponent: () => import('./campaign-tabletop/campaign-tabletop.component').then(m => m.CampaignTabletopComponent)
+  },
+  {
     path: ':id/tools',
     loadComponent: () => import('./campaign-tools/campaign-tools.component').then(m => m.CampaignToolsComponent)
   },

@@ -97,7 +97,8 @@ type SessionCreatedEvent = {
         </div>
 
         <div class="hero-actions">
-          <a class="btn btn-primary" [routerLink]="['/campaigns', campaign.id, 'tools']">Ferramentas da Mesa</a>
+          <a class="btn btn-primary" [routerLink]="['/campaigns', campaign.id, 'tabletop']">Mesa Online (VTT Beta)</a>
+          <a class="btn btn-outline" [routerLink]="['/campaigns', campaign.id, 'tools']">Ferramentas da Mesa</a>
           <a class="btn btn-outline" [routerLink]="['/campaigns', campaign.id, 'combat']">Combate</a>
           <a class="btn btn-outline" [routerLink]="['/campaigns', campaign.id, 'compendium']">Compendio</a>
           <a class="btn btn-outline" [routerLink]="['/campaigns', campaign.id, 'schedule']">Agenda</a>
