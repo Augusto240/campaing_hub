@@ -43,6 +43,7 @@ Expected migration order:
 - `20260320120000_security_hardening`
 - `20260320143000_phase3_multisystem`
 - `20260321003703_phase7_combat_creatures_proposals`
+- `20260326140000_phase8_wiki_hierarchy_legacy`
 
 In clean environments, use `prisma migrate deploy`.
 
@@ -86,6 +87,8 @@ LOG_LEVEL=info
 - `POST /api/dice/roll`
 - `GET /api/dice/campaign/:campaignId`
 - `GET /api/wiki/campaign/:campaignId`
+- `GET /api/wiki/campaign/:campaignId/tree`
+- `POST /api/wiki/campaign/:campaignId/seed-legacy`
 - `PATCH /api/sessions/:sessionId/log`
 - `POST /api/characters/:characterId/sanity-check`
 - `POST /api/characters/:characterId/spell-cast`

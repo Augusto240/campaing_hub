@@ -116,6 +116,30 @@ O dashboard mostra:
 - Level ups de personagens
 - Marcar como lida
 
+### 📚 Wiki Hierárquica + Legado 2023
+
+**Importar conteudo canonico do legado:**
+1. Entre em uma campanha como GM
+2. Acesse a aba Wiki da campanha
+3. Clique em **Importar legado 2023**
+4. O sistema cria automaticamente paginas base para:
+    - Legado 2023
+    - Augustus Frostborne
+    - Satoru Naitokira
+    - Rolador Arcano 4d6
+    - Galeria de Artes RPG
+
+**Organizar em arvore (estilo caderno):**
+- Crie paginas com pai/filho (subpaginas)
+- Reordene a estrutura escolhendo a pagina pai no editor
+- Use a arvore lateral para navegar no lore da campanha
+
+**Links internos e backlinks:**
+- No editor, use `@Nome da Pagina` para criar referencias internas
+- Ao abrir uma pagina, veja:
+   - Paginas citadas por ela
+   - Backlinks (quem cita essa pagina)
+
 ## 🎯 Cenários de Uso
 
 ### Scenario 1: Novo Mestre de Jogo
@@ -261,6 +285,17 @@ GET    /api/sessions/:sessionId/report.pdf - Baixar PDF
 ### Dashboard
 ```
 GET /api/dashboard/stats - Estatísticas gerais
+```
+
+### Wiki
+```
+GET  /api/wiki/campaign/:campaignId             - Listar paginas wiki
+GET  /api/wiki/campaign/:campaignId/tree        - Arvore hierarquica da wiki
+POST /api/wiki/campaign/:campaignId/seed-legacy - Importar legado 2023 (GM)
+GET  /api/wiki/:wikiPageId                      - Ver pagina wiki
+POST /api/wiki                                  - Criar pagina wiki
+PUT  /api/wiki/:wikiPageId                      - Atualizar pagina wiki
+DELETE /api/wiki/:wikiPageId                    - Remover pagina wiki
 ```
 
 ### Notificações

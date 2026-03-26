@@ -4,8 +4,10 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   ApiResponse,
+  LegacyWikiSeedResult,
   WikiPage,
   WikiCategory,
+  WikiTreeNode,
   CreateWikiPagePayload,
   UpdateWikiPagePayload,
 } from '../types';
@@ -47,6 +49,17 @@ export class WikiService {
 
   getPageById(wikiPageId: string): Observable<ApiResponse<WikiPage>> {
     return this.http.get<ApiResponse<WikiPage>>(`${this.API_URL}/${wikiPageId}`);
+  }
+
+  getCampaignTree(campaignId: string): Observable<ApiResponse<WikiTreeNode[]>> {
+    return this.http.get<ApiResponse<WikiTreeNode[]>>(`${this.API_URL}/campaign/${campaignId}/tree`);
+  }
+
+  seedLegacy(campaignId: string): Observable<ApiResponse<LegacyWikiSeedResult>> {
+    return this.http.post<ApiResponse<LegacyWikiSeedResult>>(
+      `${this.API_URL}/campaign/${campaignId}/seed-legacy`,
+      {}
+    );
   }
 
   createPage(payload: CreateWikiPagePayload): Observable<ApiResponse<WikiPage>> {

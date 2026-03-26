@@ -57,6 +57,7 @@ Três anos depois, evoluiu para uma **plataforma completa e moderna** com autent
 - **Permissões** — Controle GM vs Player por campanha (somente GM cria sessões, espólios, etc.)
 - **Engine Multi-Sistema** — Templates de regras para D&D 5e, PF2e, CoC 7e e Tormenta20
 - **Wiki de Campanha** — Páginas markdown com categorias, tags e visibilidade pública/GM
+- **Wiki Hierárquica + Legado 2023** — Arvore de paginas com pai/filhos, importacao canonica de Augustus/Satoru/galeria/4d6, links internos `@Pagina` e backlinks
 - **Histórico Persistido de Rolagens** — Fórmulas com `kh/kl`, `advantage/disadvantage` e modificador por atributo
 - **Sanidade e Mana** — Fluxos específicos para CoC (sanity check) e Tormenta20 (spell cast + fé)
 
@@ -328,10 +329,26 @@ ng serve                   # Inicia na porta 4200
 | `POST` | `/api/dice/roll` | Executar rolagem persistida |
 | `GET` | `/api/dice/campaign/:campaignId` | Histórico de rolagens por campanha |
 | `GET` | `/api/wiki/campaign/:campaignId` | Listar páginas da wiki |
+| `GET` | `/api/wiki/campaign/:campaignId/tree` | Retornar árvore hierárquica da wiki |
+| `POST` | `/api/wiki/campaign/:campaignId/seed-legacy` | Importar conteúdo canônico do legado 2023 (GM) |
 | `GET` | `/api/wiki/:wikiPageId` | Obter página da wiki |
 | `POST` | `/api/wiki` | Criar página da wiki |
 | `PUT` | `/api/wiki/:wikiPageId` | Atualizar página da wiki |
 | `DELETE` | `/api/wiki/:wikiPageId` | Remover página da wiki |
+
+### Wiki viva: como usar o legado
+
+1. Entre em uma campanha como GM.
+2. Acesse `/campaigns/:id/wiki`.
+3. Clique em **Importar legado 2023** para criar automaticamente:
+  - `Legado 2023`
+  - `Augustus Frostborne`
+  - `Satoru Naitokira`
+  - `Rolador Arcano 4d6 (Legado JS Puro)`
+  - `Galeria de Artes RPG (Legado)`
+4. Crie subpaginas pela arvore lateral e use `@Nome da Pagina` no conteudo para gerar links internos e backlinks.
+
+Guia tecnico detalhado: `WIKI_LEGADO_E_HIERARQUIA.md`.
 
 ---
 
@@ -346,7 +363,7 @@ O projeto usa um **tema dark fantasy RPG** com CSS Custom Properties:
 | `--accent-primary` | `#c9a84c` | Dourado — destaque principal |
 | `--accent-secondary` | `#b8860b` | Dourado escuro |
 | `--font-display` | `Cinzel` | Títulos (serif medieval) |
-| `--font-body` | `Inter` | Texto corrido (sans-serif) |
+| `--font-body` | `Crimson Text` | Texto corrido (serif editorial) |
 | `--font-fantasy` | `MedievalSharp` | Elementos especiais |
 
 ### Temas por Sistema de RPG
@@ -430,6 +447,8 @@ docker compose exec postgres psql -U campaign_user -d campaign_hub
 - `20260320110000_initial_schema`
 - `20260320120000_security_hardening`
 - `20260320143000_phase3_multisystem`
+- `20260321003703_phase7_combat_creatures_proposals`
+- `20260326140000_phase8_wiki_hierarchy_legacy`
 
 ---
 

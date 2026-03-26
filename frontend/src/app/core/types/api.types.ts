@@ -199,6 +199,8 @@ export interface Notification {
 export interface WikiPage {
   id: string;
   campaignId: string;
+  parentPageId: string | null;
+  legacySource: string | null;
   title: string;
   content: string;
   category: WikiCategory;
@@ -207,6 +209,29 @@ export interface WikiPage {
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
+  linkedPages?: WikiPageReference[];
+  backlinks?: WikiPageReference[];
+}
+
+export interface WikiPageReference {
+  id: string;
+  title: string;
+}
+
+export interface WikiTreeNode {
+  id: string;
+  title: string;
+  category: WikiCategory;
+  isPublic: boolean;
+  parentPageId: string | null;
+  updatedAt: string;
+  children: WikiTreeNode[];
+}
+
+export interface LegacyWikiSeedResult {
+  created: number;
+  skipped: number;
+  total: number;
 }
 
 export interface WikiPageWithAuthor extends WikiPage {
@@ -424,6 +449,7 @@ export interface AssignLootInput {
 
 export interface CreateWikiPageInput {
   campaignId: string;
+  parentPageId?: string | null;
   title: string;
   content: string;
   category: WikiCategory;
@@ -432,6 +458,7 @@ export interface CreateWikiPageInput {
 }
 
 export interface UpdateWikiPageInput {
+  parentPageId?: string | null;
   title?: string;
   content?: string;
   category?: WikiCategory;

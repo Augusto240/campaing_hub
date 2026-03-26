@@ -356,6 +356,8 @@ model ActivityLog {
 model WikiPage {
   id         String       @id @default(uuid())
   campaignId String       @map("campaign_id")
+  parentPageId String?    @map("parent_page_id")
+  legacySource String?    @map("legacy_source")
   title      String
   content    String
   category   WikiCategory
@@ -366,9 +368,13 @@ model WikiPage {
   updatedAt  DateTime     @updatedAt @map("updated_at")
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  parent   WikiPage? @relation("WikiPageHierarchy", fields: [parentPageId], references: [id], onDelete: SetNull)
+  children WikiPage[] @relation("WikiPageHierarchy")
   author   User     @relation("WikiPageAuthor", fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@index([campaignId, category])
+  @@index([campaignId, parentPageId])
+  @@index([campaignId, legacySource])
   @@map("wiki_pages")
 }
 

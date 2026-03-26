@@ -29,6 +29,7 @@ export const listWikiPagesQuerySchema = z.object({
 
 export const createWikiPageSchema = z.object({
   campaignId: z.string().uuid(),
+  parentPageId: z.string().uuid().nullable().optional(),
   title: z.string().trim().min(1).max(200),
   content: z.string().trim().min(1).max(100000),
   category: z.enum([
@@ -48,6 +49,7 @@ export const createWikiPageSchema = z.object({
 
 export const updateWikiPageSchema = z
   .object({
+    parentPageId: z.string().uuid().nullable().optional(),
     title: z.string().trim().min(1).max(200).optional(),
     content: z.string().trim().min(1).max(100000).optional(),
     category: z

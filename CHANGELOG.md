@@ -68,6 +68,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Wiki hierarquica de campanha com suporte a pagina pai/filho
+- Importacao canonica do legado 2023 por campanha (Augustus, Satoru, galeria e rolador 4d6)
+- Endpoint de arvore da wiki para navegacao estilo caderno
+- Suporte a links internos `@Pagina` com resolucao de backlinks
+- Nova tela da wiki de campanha com arvore lateral, criacao de subpagina e painel de referencias
+- Testes de integracao para fluxo de wiki (hierarquia, ciclo, idempotencia e permissao GM)
+
+### Changed
+- Modelo Prisma `wiki_pages` expandido com `parent_page_id` e `legacy_source`
+- Documentacao principal atualizada com rotas e fluxo da wiki viva
+
 ### Planned Features
 - WebSocket support for real-time collaboration
 - Email notifications

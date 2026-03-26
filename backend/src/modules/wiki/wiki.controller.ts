@@ -37,6 +37,23 @@ export const getCampaignWikiPages = asyncHandler(
 );
 
 /**
+ * GET /api/wiki/campaign/:campaignId/tree
+ * Retorna arvore hierarquica da wiki da campanha.
+ */
+export const getCampaignWikiTree = asyncHandler(
+  async (req: AuthRequest, res: Response, _next: NextFunction) => {
+    const { campaignId } = validate(campaignIdParamsSchema, req.params);
+
+    const tree = await wikiService.getPageTree({
+      campaignId,
+      userId: req.user!.id,
+    });
+
+    res.json(success(tree, 'Wiki tree retrieved successfully'));
+  }
+);
+
+/**
  * GET /api/wiki/:wikiPageId
  * Retorna uma pagina wiki.
  */
@@ -56,13 +73,14 @@ export const getWikiPageById = asyncHandler(
  */
 export const createWikiPage = asyncHandler(
   async (req: AuthRequest, res: Response, _next: NextFunction) => {
-    const { campaignId, title, content, category, tags, isPublic } = validate(
+    const { campaignId, parentPageId, title, content, category, tags, isPublic } = validate(
       createWikiPageSchema,
       req.body
     );
 
     const page = await wikiService.createPage({
       campaignId,
+      parentPageId,
       userId: req.user!.id,
       title,
       content,
@@ -82,11 +100,15 @@ export const createWikiPage = asyncHandler(
 export const updateWikiPage = asyncHandler(
   async (req: AuthRequest, res: Response, _next: NextFunction) => {
     const { wikiPageId } = validate(wikiPageIdParamsSchema, req.params);
-    const { title, content, category, tags, isPublic } = validate(updateWikiPageSchema, req.body);
+    const { parentPageId, title, content, category, tags, isPublic } = validate(
+      updateWikiPageSchema,
+      req.body
+    );
 
     const page = await wikiService.updatePage({
       userId: req.user!.id,
       wikiPageId,
+      parentPageId,
       title,
       content,
       category,
@@ -95,6 +117,23 @@ export const updateWikiPage = asyncHandler(
     });
 
     res.json(success(page, 'Wiki page updated successfully'));
+  }
+);
+
+/**
+ * POST /api/wiki/campaign/:campaignId/seed-legacy
+ * Importa paginas canonicas do legado 2023.
+ */
+export const seedLegacyWikiContent = asyncHandler(
+  async (req: AuthRequest, res: Response, _next: NextFunction) => {
+    const { campaignId } = validate(campaignIdParamsSchema, req.params);
+
+    const result = await wikiService.seedLegacyPages({
+      campaignId,
+      userId: req.user!.id,
+    });
+
+    res.status(201).json(success(result, 'Legacy wiki content imported successfully'));
   }
 );
 
