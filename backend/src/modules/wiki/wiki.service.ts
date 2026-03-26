@@ -1,6 +1,7 @@
 import { Prisma, WikiCategory } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { AppError } from '../../utils/error-handler';
+import { WikiBacklinksService } from './wiki-backlinks.service';
 
 type PrismaClientLike = Prisma.TransactionClient | typeof prisma;
 
@@ -16,6 +17,7 @@ interface ListWikiPagesInput {
   search?: string;
   tag?: string;
   limit: number;
+  parentId?: string | null;
 }
 
 interface CreateWikiPageInput {
@@ -26,6 +28,9 @@ interface CreateWikiPageInput {
   category: WikiCategory;
   tags: string[];
   isPublic: boolean;
+  parentId?: string;
+  icon?: string;
+  coverImage?: string;
 }
 
 interface UpdateWikiPageInput {
@@ -36,6 +41,22 @@ interface UpdateWikiPageInput {
   category?: WikiCategory;
   tags?: string[];
   isPublic?: boolean;
+  parentId?: string | null;
+  icon?: string;
+  coverImage?: string;
+  position?: number;
+  isFavorite?: boolean;
+}
+
+interface WikiTreeNode {
+  id: string;
+  title: string;
+  icon: string | null;
+  category: WikiCategory;
+  isPublic: boolean;
+  position: number;
+  isFavorite: boolean;
+  children: WikiTreeNode[];
 }
 
 const buildSearchFilter = (search?: string) =>
@@ -49,6 +70,8 @@ const buildSearchFilter = (search?: string) =>
     : {};
 
 export class WikiService {
+  private backlinksService = new WikiBacklinksService();
+
   private async getCampaignAccess(
     campaignId: string,
     userId: string,
@@ -92,6 +115,7 @@ export class WikiService {
         ...(input.tag ? { tags: { has: input.tag } } : {}),
         ...buildSearchFilter(input.search),
         ...(access.isGm ? {} : { isPublic: true }),
+        ...(input.parentId !== undefined ? { parentId: input.parentId } : {}),
       },
       include: {
         author: {
@@ -101,10 +125,65 @@ export class WikiService {
             email: true,
           },
         },
+        _count: {
+          select: { children: true, blocks: true },
+        },
       },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: [{ position: 'asc' }, { updatedAt: 'desc' }],
       take: input.limit,
     });
+  }
+
+  async getPageTree(campaignId: string, userId: string): Promise<WikiTreeNode[]> {
+    const access = await this.getCampaignAccess(campaignId, userId);
+
+    const allPages = await prisma.wikiPage.findMany({
+      where: {
+        campaignId: access.campaignId,
+        ...(access.isGm ? {} : { isPublic: true }),
+      },
+      select: {
+        id: true,
+        title: true,
+        icon: true,
+        category: true,
+        isPublic: true,
+        position: true,
+        isFavorite: true,
+        parentId: true,
+      },
+      orderBy: [{ position: 'asc' }, { title: 'asc' }],
+    });
+
+    // Build tree structure
+    const pageMap = new Map<string, WikiTreeNode>();
+    const rootPages: WikiTreeNode[] = [];
+
+    // First pass: create nodes
+    for (const page of allPages) {
+      pageMap.set(page.id, {
+        id: page.id,
+        title: page.title,
+        icon: page.icon,
+        category: page.category,
+        isPublic: page.isPublic,
+        position: page.position,
+        isFavorite: page.isFavorite,
+        children: [],
+      });
+    }
+
+    // Second pass: build hierarchy
+    for (const page of allPages) {
+      const node = pageMap.get(page.id)!;
+      if (page.parentId && pageMap.has(page.parentId)) {
+        pageMap.get(page.parentId)!.children.push(node);
+      } else {
+        rootPages.push(node);
+      }
+    }
+
+    return rootPages;
   }
 
   async getPage(wikiPageId: string, userId: string) {
@@ -116,6 +195,37 @@ export class WikiService {
             id: true,
             name: true,
             email: true,
+          },
+        },
+        parent: {
+          select: {
+            id: true,
+            title: true,
+            icon: true,
+          },
+        },
+        children: {
+          select: {
+            id: true,
+            title: true,
+            icon: true,
+            category: true,
+          },
+          orderBy: { position: 'asc' },
+        },
+        blocks: {
+          orderBy: { position: 'asc' },
+        },
+        incomingLinks: {
+          include: {
+            sourcePage: {
+              select: {
+                id: true,
+                title: true,
+                icon: true,
+                category: true,
+              },
+            },
           },
         },
       },
@@ -142,7 +252,17 @@ export class WikiService {
         throw new AppError(403, 'Only GMs can create private wiki pages');
       }
 
-      return tx.wikiPage.create({
+      // Get max position for new page
+      const maxPositionPage = await tx.wikiPage.findFirst({
+        where: {
+          campaignId: input.campaignId,
+          parentId: input.parentId || null,
+        },
+        orderBy: { position: 'desc' },
+      });
+      const position = (maxPositionPage?.position ?? -1) + 1;
+
+      const page = await tx.wikiPage.create({
         data: {
           campaignId: input.campaignId,
           title: input.title,
@@ -151,6 +271,10 @@ export class WikiService {
           tags: input.tags,
           createdBy: input.userId,
           isPublic: input.isPublic,
+          parentId: input.parentId || null,
+          icon: input.icon,
+          coverImage: input.coverImage,
+          position,
         },
         include: {
           author: {
@@ -162,6 +286,11 @@ export class WikiService {
           },
         },
       });
+
+      // Update backlinks
+      await this.backlinksService.updateBacklinks(page.id, input.campaignId, input.content);
+
+      return page;
     });
   }
 
@@ -186,7 +315,7 @@ export class WikiService {
         throw new AppError(403, 'Only GMs can make a wiki page private');
       }
 
-      return tx.wikiPage.update({
+      const updatedPage = await tx.wikiPage.update({
         where: { id: input.wikiPageId },
         data: {
           title: input.title,
@@ -194,6 +323,11 @@ export class WikiService {
           category: input.category,
           tags: input.tags,
           isPublic: input.isPublic,
+          parentId: input.parentId,
+          icon: input.icon,
+          coverImage: input.coverImage,
+          position: input.position,
+          isFavorite: input.isFavorite,
         },
         include: {
           author: {
@@ -205,6 +339,17 @@ export class WikiService {
           },
         },
       });
+
+      // Update backlinks if content changed
+      if (input.content !== undefined) {
+        await this.backlinksService.updateBacklinks(
+          updatedPage.id,
+          page.campaignId,
+          input.content
+        );
+      }
+
+      return updatedPage;
     });
   }
 
@@ -224,10 +369,91 @@ export class WikiService {
         throw new AppError(403, 'You can only delete your own wiki pages unless you are GM');
       }
 
+      // Move children to parent or root
+      await tx.wikiPage.updateMany({
+        where: { parentId: wikiPageId },
+        data: { parentId: page.parentId },
+      });
+
       await tx.wikiPage.delete({
         where: { id: wikiPageId },
       });
     });
   }
-}
 
+  async movePage(wikiPageId: string, userId: string, newParentId: string | null, newPosition: number) {
+    const page = await prisma.wikiPage.findUnique({
+      where: { id: wikiPageId },
+    });
+
+    if (!page) {
+      throw new AppError(404, 'Wiki page not found');
+    }
+
+    const access = await this.getCampaignAccess(page.campaignId, userId);
+    if (!access.isGm && page.createdBy !== userId) {
+      throw new AppError(403, 'You can only move your own wiki pages unless you are GM');
+    }
+
+    // Prevent circular reference
+    if (newParentId) {
+      let currentParent = newParentId;
+      while (currentParent) {
+        if (currentParent === wikiPageId) {
+          throw new AppError(400, 'Cannot move page into its own descendant');
+        }
+        const parent = await prisma.wikiPage.findUnique({
+          where: { id: currentParent },
+          select: { parentId: true },
+        });
+        currentParent = parent?.parentId || '';
+      }
+    }
+
+    return prisma.wikiPage.update({
+      where: { id: wikiPageId },
+      data: {
+        parentId: newParentId,
+        position: newPosition,
+      },
+    });
+  }
+
+  async toggleFavorite(wikiPageId: string, userId: string) {
+    const page = await prisma.wikiPage.findUnique({
+      where: { id: wikiPageId },
+    });
+
+    if (!page) {
+      throw new AppError(404, 'Wiki page not found');
+    }
+
+    await this.getCampaignAccess(page.campaignId, userId);
+
+    return prisma.wikiPage.update({
+      where: { id: wikiPageId },
+      data: {
+        isFavorite: !page.isFavorite,
+      },
+    });
+  }
+
+  async getFavorites(campaignId: string, userId: string) {
+    const access = await this.getCampaignAccess(campaignId, userId);
+
+    return prisma.wikiPage.findMany({
+      where: {
+        campaignId: access.campaignId,
+        isFavorite: true,
+        ...(access.isGm ? {} : { isPublic: true }),
+      },
+      select: {
+        id: true,
+        title: true,
+        icon: true,
+        category: true,
+      },
+      orderBy: { title: 'asc' },
+    });
+  }
+}

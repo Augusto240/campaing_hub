@@ -60,6 +60,11 @@ enum WikiCategory {
   DEITY
   MYTHOS
   SESSION_RECAP
+  CHARACTER
+  EVENT
+  ITEM
+  QUEST
+  TIMELINE
 }
 
 enum ProposalStatus {
@@ -122,10 +127,16 @@ model RpgSystem {
   hasHeroPoints   Boolean  @default(false) @map("has_hero_points")
   createdAt       DateTime @default(now()) @map("created_at")
 
-  campaigns  Campaign[]
-  characters Character[]
-  items      Item[]
-  creatures  Creature[]
+  campaigns        Campaign[]
+  characters       Character[]
+  items            Item[]
+  creatures        Creature[]
+  spells           Spell[]
+  characterClasses CharacterClass[]
+  ancestries       Ancestry[]
+  conditions       Condition[]
+  feats            Feat[]
+  backgrounds      Background[]
 
   @@map("rpg_systems")
 }
@@ -141,15 +152,16 @@ model Campaign {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  owner          User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  systemTemplate RpgSystem?       @relation(fields: [systemId], references: [id], onDelete: SetNull)
-  members        CampaignMember[]
-  characters     Character[]
-  sessions       Session[]
-  events         Event[]
-  wikiPages      WikiPage[]
-  diceRolls      DiceRoll[]
+  owner            User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  systemTemplate   RpgSystem?       @relation(fields: [systemId], references: [id], onDelete: SetNull)
+  members          CampaignMember[]
+  characters       Character[]
+  sessions         Session[]
+  events           Event[]
+  wikiPages        WikiPage[]
+  diceRolls        DiceRoll[]
   sessionProposals SessionProposal[]
+  gameMaps         GameMap[]
 
   @@map("campaigns")
 }
@@ -197,6 +209,7 @@ model Character {
   spellCasts     SpellCast[]
   diceRolls      DiceRoll[]
   combatants     Combatant[]
+  mapTokens      MapToken[]
 
   @@map("characters")
 }
@@ -365,11 +378,312 @@ model WikiPage {
   createdAt  DateTime     @default(now()) @map("created_at")
   updatedAt  DateTime     @updatedAt @map("updated_at")
 
-  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  author   User     @relation("WikiPageAuthor", fields: [createdBy], references: [id], onDelete: Cascade)
+  // Hierarchical structure (Notion-like)
+  parentId   String?      @map("parent_id")
+  icon       String?      // emoji or icon name
+  coverImage String?      @map("cover_image")
+  position   Int          @default(0)
+  isFavorite Boolean      @default(false) @map("is_favorite")
+
+  campaign   Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  author     User         @relation("WikiPageAuthor", fields: [createdBy], references: [id], onDelete: Cascade)
+  parent     WikiPage?    @relation("WikiPageHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children   WikiPage[]   @relation("WikiPageHierarchy")
+  blocks     WikiBlock[]
+  outgoingLinks WikiBacklink[] @relation("WikiBacklinkSource")
+  incomingLinks WikiBacklink[] @relation("WikiBacklinkTarget")
 
   @@index([campaignId, category])
+  @@index([parentId])
   @@map("wiki_pages")
+}
+
+// Block-based content (Notion-like editor)
+enum WikiBlockType {
+  TEXT
+  HEADING_1
+  HEADING_2
+  HEADING_3
+  BULLETED_LIST
+  NUMBERED_LIST
+  TODO
+  TOGGLE
+  QUOTE
+  CALLOUT
+  CODE
+  DIVIDER
+  IMAGE
+  LINK_TO_PAGE
+  EMBED
+}
+
+model WikiBlock {
+  id         String        @id @default(uuid())
+  pageId     String        @map("page_id")
+  type       WikiBlockType
+  content    Json          // flexible content based on type
+  position   Int           @default(0)
+  indent     Int           @default(0)
+  isChecked  Boolean?      @map("is_checked") // for TODO blocks
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+
+  page WikiPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, position])
+  @@map("wiki_blocks")
+}
+
+// Backlinks for wiki pages (knowledge graph)
+model WikiBacklink {
+  id           String   @id @default(uuid())
+  sourcePageId String   @map("source_page_id")
+  targetPageId String   @map("target_page_id")
+  context      String?  // surrounding text snippet
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  sourcePage WikiPage @relation("WikiBacklinkSource", fields: [sourcePageId], references: [id], onDelete: Cascade)
+  targetPage WikiPage @relation("WikiBacklinkTarget", fields: [targetPageId], references: [id], onDelete: Cascade)
+
+  @@unique([sourcePageId, targetPageId])
+  @@index([targetPageId])
+  @@map("wiki_backlinks")
+}
+
+// Templates for wiki pages
+model WikiTemplate {
+  id          String       @id @default(uuid())
+  name        String
+  description String?
+  category    WikiCategory
+  icon        String?
+  blocks      Json         // array of block structures
+  createdBy   String       @map("created_by")
+  isPublic    Boolean      @default(true) @map("is_public")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@map("wiki_templates")
+}
+
+// ===========================================
+// VTT (Virtual Tabletop) Models
+// ===========================================
+
+enum GridType {
+  SQUARE
+  HEX_HORIZONTAL
+  HEX_VERTICAL
+  NONE
+}
+
+model GameMap {
+  id           String    @id @default(uuid())
+  campaignId   String    @map("campaign_id")
+  name         String
+  imageUrl     String    @map("image_url")
+  width        Int       @default(1920)
+  height       Int       @default(1080)
+  gridType     GridType  @default(SQUARE) @map("grid_type")
+  gridSize     Int       @default(50) @map("grid_size")
+  gridColor    String    @default("#000000") @map("grid_color")
+  gridOpacity  Float     @default(0.3) @map("grid_opacity")
+  fogOfWar     Json?     @map("fog_of_war") // array of revealed areas
+  walls        Json?     // array of wall segments for line of sight
+  lights       Json?     // array of light sources
+  isActive     Boolean   @default(false) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  campaign Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  tokens   MapToken[]
+
+  @@index([campaignId])
+  @@map("game_maps")
+}
+
+model MapToken {
+  id          String   @id @default(uuid())
+  mapId       String   @map("map_id")
+  name        String
+  imageUrl    String?  @map("image_url")
+  x           Float    @default(0)
+  y           Float    @default(0)
+  width       Int      @default(1) // in grid units
+  height      Int      @default(1)
+  rotation    Float    @default(0)
+  isVisible   Boolean  @default(true) @map("is_visible")
+  isLocked    Boolean  @default(false) @map("is_locked")
+  layer       String   @default("tokens")
+  conditions  String[] @default([])
+  hp          Int?
+  maxHp       Int?     @map("max_hp")
+  aura        Json?    // aura effects
+  vision      Json?    // vision settings (darkvision, etc)
+  characterId String?  @map("character_id")
+  creatureId  String?  @map("creature_id")
+  controlledBy String[] @default([]) @map("controlled_by") // user IDs who can move
+
+  map       GameMap    @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  character Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  creature  Creature?  @relation(fields: [creatureId], references: [id], onDelete: SetNull)
+
+  @@index([mapId])
+  @@map("map_tokens")
+}
+
+// ===========================================
+// Compendium Models (5eTools-like)
+// ===========================================
+
+enum SpellSchool {
+  ABJURATION
+  CONJURATION
+  DIVINATION
+  ENCHANTMENT
+  EVOCATION
+  ILLUSION
+  NECROMANCY
+  TRANSMUTATION
+  UNIVERSAL
+}
+
+enum MagicType {
+  ARCANE
+  DIVINE
+  PRIMAL
+  OCCULT
+  UNIVERSAL
+}
+
+model Spell {
+  id            String      @id @default(uuid())
+  systemId      String      @map("system_id")
+  name          String
+  level         Int
+  school        SpellSchool
+  magicType     MagicType   @default(ARCANE) @map("magic_type")
+  castingTime   String      @map("casting_time")
+  range         String
+  components    String
+  duration      String
+  description   String
+  higherLevels  String?     @map("higher_levels")
+  ritual        Boolean     @default(false)
+  concentration Boolean     @default(false)
+  classes       String[]    @default([])
+  source        String?
+  isHomebrew    Boolean     @default(false) @map("is_homebrew")
+  createdBy     String?     @map("created_by")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  systemTemplate RpgSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@unique([systemId, name])
+  @@index([systemId, level])
+  @@index([school])
+  @@map("spells")
+}
+
+model CharacterClass {
+  id           String   @id @default(uuid())
+  systemId     String   @map("system_id")
+  name         String
+  description  String
+  hitDie       String   @map("hit_die")
+  primaryAbility String @map("primary_ability")
+  savingThrows String[] @default([]) @map("saving_throws")
+  skills       String[] @default([])
+  equipment    Json?
+  features     Json     // class features by level
+  subclasses   Json?    // available subclasses
+  spellcasting Json?    // spellcasting rules
+  source       String?
+  isHomebrew   Boolean  @default(false) @map("is_homebrew")
+  createdBy    String?  @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  systemTemplate RpgSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@unique([systemId, name])
+  @@map("character_classes")
+}
+
+model Ancestry {
+  id          String   @id @default(uuid())
+  systemId    String   @map("system_id")
+  name        String
+  description String
+  speed       Int      @default(30)
+  size        String   @default("Medium")
+  traits      Json     // racial traits
+  languages   String[] @default([])
+  subraces    Json?
+  source      String?
+  isHomebrew  Boolean  @default(false) @map("is_homebrew")
+  createdBy   String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  systemTemplate RpgSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@unique([systemId, name])
+  @@map("ancestries")
+}
+
+model Condition {
+  id          String   @id @default(uuid())
+  systemId    String   @map("system_id")
+  name        String
+  description String
+  effects     Json     // mechanical effects
+  icon        String?
+  color       String?  @default("#ff0000")
+  source      String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  systemTemplate RpgSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@unique([systemId, name])
+  @@map("conditions")
+}
+
+model Feat {
+  id            String   @id @default(uuid())
+  systemId      String   @map("system_id")
+  name          String
+  description   String
+  prerequisites String?
+  benefits      Json
+  source        String?
+  isHomebrew    Boolean  @default(false) @map("is_homebrew")
+  createdBy     String?  @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  systemTemplate RpgSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@unique([systemId, name])
+  @@map("feats")
+}
+
+model Background {
+  id              String   @id @default(uuid())
+  systemId        String   @map("system_id")
+  name            String
+  description     String
+  skillProficiencies String[] @default([]) @map("skill_proficiencies")
+  toolProficiencies String[] @default([]) @map("tool_proficiencies")
+  languages       Int      @default(0)
+  equipment       Json?
+  feature         Json     // background feature
+  suggestedCharacteristics Json? @map("suggested_characteristics")
+  source          String?
+  isHomebrew      Boolean  @default(false) @map("is_homebrew")
+  createdBy       String?  @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  systemTemplate RpgSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@unique([systemId, name])
+  @@map("backgrounds")
 }
 
 model DiceRoll {
@@ -442,8 +756,9 @@ model Creature {
   createdBy    String    @map("created_by")
   createdAt    DateTime  @default(now()) @map("created_at")
 
-  systemTemplate RpgSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
-  creator        User      @relation("CreatureAuthor", fields: [createdBy], references: [id], onDelete: Cascade)
+  systemTemplate RpgSystem  @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  creator        User       @relation("CreatureAuthor", fields: [createdBy], references: [id], onDelete: Cascade)
+  mapTokens      MapToken[]
 
   @@index([systemId, creatureType])
   @@unique([systemId, name])
