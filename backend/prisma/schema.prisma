@@ -62,6 +62,16 @@ enum WikiCategory {
   SESSION_RECAP
 }
 
+enum WikiBlockType {
+  TEXT
+  CHECKLIST
+  QUOTE
+  CALLOUT
+  CODE
+  IMAGE
+  TABLE
+}
+
 enum ProposalStatus {
   OPEN
   DECIDED
@@ -86,6 +96,7 @@ model User {
   createdSessions Session[]
   refreshTokens   RefreshToken[]
   wikiPages       WikiPage[]       @relation("WikiPageAuthor")
+  wikiFavorites   WikiFavorite[]
   diceRolls       DiceRoll[]
   creatures       Creature[]       @relation("CreatureAuthor")
   sessionProposals SessionProposal[] @relation("SessionProposalAuthor")
@@ -356,6 +367,7 @@ model ActivityLog {
 model WikiPage {
   id         String       @id @default(uuid())
   campaignId String       @map("campaign_id")
+  parentPageId String?    @map("parent_page_id")
   title      String
   content    String
   category   WikiCategory
@@ -367,9 +379,43 @@ model WikiPage {
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   author   User     @relation("WikiPageAuthor", fields: [createdBy], references: [id], onDelete: Cascade)
+  parent   WikiPage? @relation("WikiPageHierarchy", fields: [parentPageId], references: [id], onDelete: SetNull)
+  children WikiPage[] @relation("WikiPageHierarchy")
+  blocks   WikiBlock[]
+  favorites WikiFavorite[]
 
   @@index([campaignId, category])
+  @@index([campaignId, parentPageId])
   @@map("wiki_pages")
+}
+
+model WikiBlock {
+  id         String       @id @default(uuid())
+  wikiPageId String       @map("wiki_page_id")
+  blockType  WikiBlockType @map("block_type")
+  sortOrder  Int          @map("sort_order")
+  payload    Json
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  page WikiPage @relation(fields: [wikiPageId], references: [id], onDelete: Cascade)
+
+  @@index([wikiPageId, sortOrder])
+  @@map("wiki_blocks")
+}
+
+model WikiFavorite {
+  id         String   @id @default(uuid())
+  wikiPageId String   @map("wiki_page_id")
+  userId     String   @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  page WikiPage @relation(fields: [wikiPageId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([wikiPageId, userId])
+  @@index([userId, createdAt])
+  @@map("wiki_favorites")
 }
 
 model DiceRoll {
