@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Campaign Hub - API Response Types
  *
  * Tipos centralizados para todas as respostas da API.
@@ -201,10 +201,6 @@ export interface WikiPage {
   id: string;
   campaignId: string;
   parentPageId: string | null;
-<<<<<<< HEAD
-  legacySource: string | null;
-=======
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
   title: string;
   content: string;
   category: WikiCategory;
@@ -213,29 +209,6 @@ export interface WikiPage {
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
-  linkedPages?: WikiPageReference[];
-  backlinks?: WikiPageReference[];
-}
-
-export interface WikiPageReference {
-  id: string;
-  title: string;
-}
-
-export interface WikiTreeNode {
-  id: string;
-  title: string;
-  category: WikiCategory;
-  isPublic: boolean;
-  parentPageId: string | null;
-  updatedAt: string;
-  children: WikiTreeNode[];
-}
-
-export interface LegacyWikiSeedResult {
-  created: number;
-  skipped: number;
-  total: number;
 }
 
 export interface WikiPageWithAuthor extends WikiPage {
@@ -294,6 +267,18 @@ export interface WikiPageRelations {
     updatedAt: string;
     sharedTags: string[];
     sharedTagsCount: number;
+  }>;
+  entityBacklinks: Array<{
+    entityType: 'CHARACTER' | 'SESSION' | 'ITEM' | 'CREATURE';
+    entityId: string;
+    title: string;
+    excerpt: string;
+    updatedAt: string;
+  }>;
+  outgoingEntities: Array<{
+    entityType: 'CHARACTER' | 'SESSION' | 'ITEM' | 'CREATURE';
+    entityId: string;
+    title: string;
   }>;
 }
 
@@ -402,6 +387,36 @@ export interface WikiMentionSuggestion {
   id: string;
   title: string;
   category: WikiCategory;
+}
+
+export type CompendiumKind = 'BESTIARY' | 'SPELL' | 'ITEM' | 'CLASS';
+
+export interface CompendiumLinkedCharacter {
+  characterId: string;
+  characterName: string;
+}
+
+export interface CompendiumEntry {
+  id: string;
+  systemSlug: string;
+  kind: CompendiumKind;
+  name: string;
+  summary: string;
+  tags: string[];
+  source: 'SRD' | 'OGL' | 'LEGACY';
+  payload: Record<string, unknown>;
+  links: {
+    usedInSessions: string[];
+    usedAsCombatantCount: number;
+    linkedCharacters: CompendiumLinkedCharacter[];
+  };
+}
+
+export interface CampaignCompendiumResponse {
+  campaignId: string;
+  systemSlug: string;
+  totals: Record<CompendiumKind, number>;
+  entries: CompendiumEntry[];
 }
 
 // ============================================================================

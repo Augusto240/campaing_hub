@@ -4,10 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CampaignService } from '../../../core/services/campaign.service';
 import { CombatService } from '../../../core/services/combat.service';
+import { CompendiumService } from '../../../core/services/compendium.service';
 import { CreatureService } from '../../../core/services/creature.service';
 import { SessionService } from '../../../core/services/session.service';
-import { RarityBadgeComponent } from '../../../shared/components/rarity-badge.component';
 import { SystemBadgeComponent } from '../../../shared/components/system-badge.component';
+import { CompendiumEntry, CompendiumKind } from '../../../core/types';
 
 type CampaignView = {
   id: string;
@@ -48,10 +49,17 @@ const CREATURE_TYPES = [
   'horror',
 ];
 
+const COMPENDIUM_TABS: Array<{ label: string; kind: CompendiumKind }> = [
+  { label: 'Bestiario', kind: 'BESTIARY' },
+  { label: 'Magias', kind: 'SPELL' },
+  { label: 'Itens', kind: 'ITEM' },
+  { label: 'Classes', kind: 'CLASS' },
+];
+
 @Component({
   selector: 'app-campaign-compendium',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, RarityBadgeComponent, SystemBadgeComponent],
+  imports: [CommonModule, FormsModule, RouterLink, SystemBadgeComponent],
   template: `
     <section class="shell" *ngIf="campaign; else loadingState">
       <header class="header card">
@@ -62,14 +70,26 @@ const CREATURE_TYPES = [
         </div>
       </header>
 
+      <nav class="tabs card">
+        <button
+          class="tab"
+          *ngFor="let tab of compendiumTabs"
+          [class.active]="activeKind === tab.kind"
+          (click)="setActiveKind(tab.kind)"
+        >
+          {{ tab.label }}
+          <span *ngIf="kindTotals[tab.kind] !== undefined">({{ kindTotals[tab.kind] }})</span>
+        </button>
+      </nav>
+
       <!-- Filtros -->
       <div class="filters card">
         <input class="form-control search" [(ngModel)]="searchTerm" (ngModelChange)="filterCreatures()" placeholder="Buscar por nome ou descricao..." />
-        <select class="form-control" [(ngModel)]="typeFilter" (change)="filterCreatures()">
+        <select class="form-control" [(ngModel)]="typeFilter" (change)="filterCreatures()" *ngIf="activeKind === 'BESTIARY'">
           <option value="">Todos os tipos</option>
           <option *ngFor="let type of creatureTypes" [value]="type">{{ type | titlecase }}</option>
         </select>
-        <div class="xp-range">
+        <div class="xp-range" *ngIf="activeKind === 'BESTIARY'">
           <label>XP: {{ xpMin }} - {{ xpMax }}</label>
           <input type="range" [(ngModel)]="xpMin" min="0" max="10000" step="100" (change)="filterCreatures()" />
           <input type="range" [(ngModel)]="xpMax" min="0" max="10000" step="100" (change)="filterCreatures()" />
@@ -77,7 +97,7 @@ const CREATURE_TYPES = [
       </div>
 
       <!-- Painel de Adicionar ao Combate -->
-      <div class="add-panel card" *ngIf="selectedCreature">
+      <div class="add-panel card" *ngIf="selectedCreature && activeKind === 'BESTIARY'">
         <h3>Adicionar {{ selectedCreature.name }} ao Combate</h3>
         <div class="form-row">
           <select class="form-control" [(ngModel)]="selectedSessionId" (change)="loadEncounters()">
@@ -95,7 +115,7 @@ const CREATURE_TYPES = [
       </div>
 
       <!-- Grid de Criaturas -->
-      <div class="creatures-grid">
+      <div class="creatures-grid" *ngIf="activeKind === 'BESTIARY'">
         <article class="creature-card card" *ngFor="let creature of filteredCreatures" (click)="selectCreature(creature)">
           <header class="creature-header">
             <h3>{{ creature.name }}</h3>
@@ -136,8 +156,42 @@ const CREATURE_TYPES = [
         </article>
       </div>
 
-      <div class="empty-state" *ngIf="filteredCreatures.length === 0">
+      <div class="creatures-grid" *ngIf="activeKind !== 'BESTIARY'">
+        <article class="creature-card card" *ngFor="let entry of knowledgeEntries">
+          <header class="creature-header">
+            <h3>{{ entry.name }}</h3>
+            <span class="xp-badge">{{ entry.source }}</span>
+          </header>
+
+          <div class="creature-type">{{ activeKind }}</div>
+          <p class="description">{{ entry.summary }}</p>
+
+          <div class="loot-items">
+            <span class="loot-item" *ngFor="let tag of entry.tags">{{ tag }}</span>
+          </div>
+
+          <div class="abilities" *ngIf="entry.links.linkedCharacters.length > 0">
+            <strong>Relacionado a personagens:</strong>
+            <ul>
+              <li *ngFor="let link of entry.links.linkedCharacters">{{ link.characterName }}</li>
+            </ul>
+          </div>
+
+          <div class="abilities" *ngIf="entry.links.usedInSessions.length > 0">
+            <strong>Usado em sessoes:</strong>
+            <ul>
+              <li *ngFor="let sessionId of entry.links.usedInSessions">{{ sessionId }}</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+
+      <div class="empty-state" *ngIf="activeKind === 'BESTIARY' && filteredCreatures.length === 0">
         <p>Nenhuma criatura encontrada com os filtros atuais.</p>
+      </div>
+
+      <div class="empty-state" *ngIf="activeKind !== 'BESTIARY' && knowledgeEntries.length === 0">
+        <p>Nenhuma entrada encontrada para os filtros atuais.</p>
       </div>
     </section>
 
@@ -152,6 +206,9 @@ const CREATURE_TYPES = [
       .header h1 { margin: 0.5rem 0; }
       .back { color: var(--text-secondary); text-decoration: none; }
       .filters { padding: 1rem; margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+      .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; padding: 0.75rem; flex-wrap: wrap; }
+      .tab { border: 1px solid var(--border-color); background: rgba(255,255,255,0.03); color: var(--text-secondary); padding: 0.45rem 0.7rem; border-radius: 999px; cursor: pointer; }
+      .tab.active { border-color: rgba(201,168,76,0.6); color: var(--text-primary); }
       .search { flex: 1; min-width: 200px; }
       .xp-range { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
       .xp-range label { font-size: 0.85rem; color: var(--text-secondary); }
@@ -203,10 +260,20 @@ export class CampaignCompendiumComponent implements OnInit {
   selectedEncounterId = '';
   addCount = 1;
   adding = false;
+  activeKind: CompendiumKind = 'BESTIARY';
+  compendiumTabs = COMPENDIUM_TABS;
+  knowledgeEntries: CompendiumEntry[] = [];
+  kindTotals: Record<CompendiumKind, number> = {
+    BESTIARY: 0,
+    SPELL: 0,
+    ITEM: 0,
+    CLASS: 0,
+  };
 
   constructor(
     private readonly route: ActivatedRoute,
     private readonly campaignService: CampaignService,
+    private readonly compendiumService: CompendiumService,
     private readonly creatureService: CreatureService,
     private readonly sessionService: SessionService,
     private readonly combatService: CombatService
@@ -220,9 +287,27 @@ export class CampaignCompendiumComponent implements OnInit {
       next: (res) => {
         this.campaign = res.data as CampaignView;
         this.loadCreatures();
+        this.loadCompendiumTotals();
+        this.loadKnowledgeEntries();
         this.loadSessions();
       },
     });
+  }
+
+  setActiveKind(kind: CompendiumKind): void {
+    if (this.activeKind === kind) {
+      return;
+    }
+
+    this.activeKind = kind;
+    this.selectedCreature = null;
+
+    if (kind === 'BESTIARY') {
+      this.filterCreatures();
+      return;
+    }
+
+    this.loadKnowledgeEntries();
   }
 
   loadCreatures(): void {
@@ -256,6 +341,11 @@ export class CampaignCompendiumComponent implements OnInit {
   }
 
   filterCreatures(): void {
+    if (this.activeKind !== 'BESTIARY') {
+      this.loadKnowledgeEntries();
+      return;
+    }
+
     const term = this.searchTerm.trim().toLowerCase();
     this.filteredCreatures = this.creatures.filter((c) => {
       const matchesTerm =
@@ -338,5 +428,43 @@ export class CampaignCompendiumComponent implements OnInit {
       return Math.floor((Number(attrs['DEX']) - 10) / 2) + 10;
     }
     return 10;
+  }
+
+  private loadKnowledgeEntries(): void {
+    if (!this.campaignId || this.activeKind === 'BESTIARY') {
+      return;
+    }
+
+    this.compendiumService
+      .getCampaignCompendium({
+        campaignId: this.campaignId,
+        kind: this.activeKind,
+        search: this.searchTerm || undefined,
+        limit: 120,
+      })
+      .subscribe({
+        next: (res) => {
+          this.knowledgeEntries = res.data.entries || [];
+          this.kindTotals = res.data.totals;
+        },
+      });
+  }
+
+  private loadCompendiumTotals(): void {
+    if (!this.campaignId) {
+      return;
+    }
+
+    this.compendiumService
+      .getCampaignCompendium({
+        campaignId: this.campaignId,
+        kind: 'BESTIARY',
+        limit: 1,
+      })
+      .subscribe({
+        next: (res) => {
+          this.kindTotals = res.data.totals;
+        },
+      });
   }
 }

@@ -139,36 +139,25 @@ export interface WikiPageRelations {
     sharedTags: string[];
     sharedTagsCount: number;
   }>;
+  entityBacklinks: Array<{
+    entityType: 'CHARACTER' | 'SESSION' | 'ITEM' | 'CREATURE';
+    entityId: string;
+    title: string;
+    excerpt: string;
+    updatedAt: Date;
+  }>;
+  outgoingEntities: Array<{
+    entityType: 'CHARACTER' | 'SESSION' | 'ITEM' | 'CREATURE';
+    entityId: string;
+    title: string;
+  }>;
 }
-
-const buildSearchFilter = (search?: string) =>
-  search && search.trim().length > 0
-    ? {
-        OR: [
-          { title: { contains: search, mode: 'insensitive' as const } },
-          { content: { contains: search, mode: 'insensitive' as const } },
-        ],
-      }
-    : {};
-
-const internalLinkRegex = /@([^\n@#.,;:!?()[\]{}]{2,80})/g;
-
-const extractMentionedPageTitles = (content: string): string[] => {
-  const mentions = new Set<string>();
-  const matches = content.matchAll(internalLinkRegex);
-
-  for (const match of matches) {
-    const title = match[1]?.trim();
-    if (title) {
-      mentions.add(title);
-    }
-  }
-
-  return [...mentions];
-};
 
 export class WikiService {
   private readonly WIKI_LINK_PATTERN = /\[\[([^\]]+)\]\]/g;
+  private readonly LEGACY_MENTION_PATTERN = /@([^\n@#.,;:!?()[\]{}]{2,80})/g;
+  private readonly UUID_PATTERN =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
   private readonly WIKI_TEMPLATES: WikiTemplateDefinition[] = [
     {
@@ -249,18 +238,462 @@ export class WikiService {
     return access.isGm ? {} : { isPublic: true };
   }
 
-  private extractWikiLinkTitles(content: string): string[] {
-    const matches = content.matchAll(this.WIKI_LINK_PATTERN);
-    const titleSet = new Set<string>();
+  private normalizeWikiTitle(title: string): string {
+    return title.trim().replace(/\s+/g, ' ').toLowerCase();
+  }
 
-    for (const match of matches) {
+  private truncateExcerpt(value: string | null | undefined, maxLength = 140): string {
+    if (!value) {
+      return '';
+    }
+
+    const normalized = value.replace(/\s+/g, ' ').trim();
+    if (normalized.length <= maxLength) {
+      return normalized;
+    }
+
+    return `${normalized.slice(0, maxLength - 1)}…`;
+  }
+
+  private async listRankedPageIdsByFullText(input: {
+    campaignId: string;
+    search: string;
+    category?: WikiCategory;
+    tag?: string;
+    access: WikiAccess;
+    limit: number;
+  }): Promise<string[]> {
+    const query = input.search.trim();
+    if (!query) {
+      return [];
+    }
+
+    const whereParts: Prisma.Sql[] = [Prisma.sql`wp.campaign_id = ${input.campaignId}`];
+
+    if (!input.access.isGm) {
+      whereParts.push(Prisma.sql`wp.is_public = TRUE`);
+    }
+
+    if (input.category) {
+      whereParts.push(
+        Prisma.sql`wp.category = CAST(${input.category} AS "WikiCategory")`
+      );
+    }
+
+    if (input.tag) {
+      whereParts.push(Prisma.sql`${input.tag} = ANY(wp.tags)`);
+    }
+
+    const rows = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT wp.id,
+             ts_rank_cd(
+               to_tsvector('portuguese', coalesce(wp.title, '') || ' ' || coalesce(wp.content, '')),
+               websearch_to_tsquery('portuguese', ${query})
+             ) AS rank
+      FROM "wiki_pages" wp
+      WHERE ${Prisma.join(
+        [
+          ...whereParts,
+          Prisma.sql`to_tsvector('portuguese', coalesce(wp.title, '') || ' ' || coalesce(wp.content, '')) @@ websearch_to_tsquery('portuguese', ${query})`,
+        ],
+        ' AND '
+      )}
+      ORDER BY rank DESC, wp.updated_at DESC
+      LIMIT ${input.limit}
+    `);
+
+    return rows.map((row) => row.id);
+  }
+
+  private async findOutgoingEntityLinks(input: {
+    campaignId: string;
+    content: string;
+    userId: string;
+    limit: number;
+  }): Promise<WikiPageRelations['outgoingEntities']> {
+    const titles = this.extractWikiLinkTitles(input.content).slice(0, 40);
+    if (titles.length === 0) {
+      return [];
+    }
+
+    const sessionIds = titles.filter((title) => this.UUID_PATTERN.test(title));
+
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: input.campaignId },
+      select: { systemId: true },
+    });
+
+    const [characters, sessionsBySummary, sessionsById, items, creatures] = await Promise.all([
+      prisma.character.findMany({
+        where: {
+          campaignId: input.campaignId,
+          OR: titles.map((title) => ({
+            name: {
+              equals: title,
+              mode: 'insensitive' as const,
+            },
+          })),
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+        take: input.limit,
+      }),
+      prisma.session.findMany({
+        where: {
+          campaignId: input.campaignId,
+          OR: titles.map((title) => ({
+            summary: {
+              equals: title,
+              mode: 'insensitive' as const,
+            },
+          })),
+        },
+        select: {
+          id: true,
+          summary: true,
+          date: true,
+        },
+        orderBy: { date: 'desc' },
+        take: input.limit,
+      }),
+      sessionIds.length > 0
+        ? prisma.session.findMany({
+            where: {
+              campaignId: input.campaignId,
+              id: {
+                in: sessionIds,
+              },
+            },
+            select: {
+              id: true,
+              summary: true,
+              date: true,
+            },
+            orderBy: { date: 'desc' },
+            take: input.limit,
+          })
+        : Promise.resolve([]),
+      campaign?.systemId
+        ? prisma.item.findMany({
+            where: {
+              systemId: campaign.systemId,
+              OR: titles.map((title) => ({
+                name: {
+                  equals: title,
+                  mode: 'insensitive' as const,
+                },
+              })),
+            },
+            select: {
+              id: true,
+              name: true,
+            },
+            take: input.limit,
+          })
+        : Promise.resolve([]),
+      campaign?.systemId
+        ? prisma.creature.findMany({
+            where: {
+              systemId: campaign.systemId,
+              OR: [
+                {
+                  isPublic: true,
+                },
+                {
+                  createdBy: input.userId,
+                },
+              ],
+              name: {
+                in: titles,
+                mode: 'insensitive' as const,
+              },
+            },
+            select: {
+              id: true,
+              name: true,
+            },
+            take: input.limit,
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const outgoing: WikiPageRelations['outgoingEntities'] = [
+      ...characters.map((entry) => ({
+        entityType: 'CHARACTER' as const,
+        entityId: entry.id,
+        title: entry.name,
+      })),
+      ...sessionsBySummary.map((entry) => ({
+        entityType: 'SESSION' as const,
+        entityId: entry.id,
+        title: entry.summary?.trim().length ? entry.summary : `Sessao ${entry.date.toISOString().slice(0, 10)}`,
+      })),
+      ...sessionsById.map((entry) => ({
+        entityType: 'SESSION' as const,
+        entityId: entry.id,
+        title: entry.summary?.trim().length ? entry.summary : `Sessao ${entry.date.toISOString().slice(0, 10)}`,
+      })),
+      ...items.map((entry) => ({
+        entityType: 'ITEM' as const,
+        entityId: entry.id,
+        title: entry.name,
+      })),
+      ...creatures.map((entry) => ({
+        entityType: 'CREATURE' as const,
+        entityId: entry.id,
+        title: entry.name,
+      })),
+    ];
+
+    const deduplicated = new Map<string, WikiPageRelations['outgoingEntities'][number]>();
+    for (const entry of outgoing) {
+      deduplicated.set(`${entry.entityType}:${entry.entityId}`, entry);
+    }
+
+    return [...deduplicated.values()].slice(0, input.limit);
+  }
+
+  private async findEntityBacklinks(input: {
+    campaignId: string;
+    pageTitle: string;
+    userId: string;
+    limit: number;
+  }): Promise<WikiPageRelations['entityBacklinks']> {
+    const wikiLinkReference = `[[${input.pageTitle}]]`;
+    const mentionReference = `@${input.pageTitle}`;
+
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: input.campaignId },
+      select: { systemId: true },
+    });
+
+    const [characters, sessions, items, creatures] = await Promise.all([
+      prisma.character.findMany({
+        where: {
+          campaignId: input.campaignId,
+          notes: {
+            not: null,
+          },
+          OR: [
+            {
+              notes: {
+                contains: wikiLinkReference,
+                mode: 'insensitive',
+              },
+            },
+            {
+              notes: {
+                contains: mentionReference,
+                mode: 'insensitive',
+              },
+            },
+          ],
+        },
+        select: {
+          id: true,
+          name: true,
+          notes: true,
+          updatedAt: true,
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: input.limit,
+      }),
+      prisma.session.findMany({
+        where: {
+          campaignId: input.campaignId,
+          OR: [
+            {
+              summary: {
+                contains: wikiLinkReference,
+                mode: 'insensitive',
+              },
+            },
+            {
+              summary: {
+                contains: mentionReference,
+                mode: 'insensitive',
+              },
+            },
+            {
+              narrativeLog: {
+                contains: wikiLinkReference,
+                mode: 'insensitive',
+              },
+            },
+            {
+              narrativeLog: {
+                contains: mentionReference,
+                mode: 'insensitive',
+              },
+            },
+            {
+              privateGmNotes: {
+                contains: wikiLinkReference,
+                mode: 'insensitive',
+              },
+            },
+            {
+              privateGmNotes: {
+                contains: mentionReference,
+                mode: 'insensitive',
+              },
+            },
+          ],
+        },
+        select: {
+          id: true,
+          summary: true,
+          narrativeLog: true,
+          privateGmNotes: true,
+          updatedAt: true,
+          date: true,
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: input.limit,
+      }),
+      campaign?.systemId
+        ? prisma.item.findMany({
+            where: {
+              systemId: campaign.systemId,
+              OR: [
+                {
+                  description: {
+                    contains: wikiLinkReference,
+                    mode: 'insensitive',
+                  },
+                },
+                {
+                  description: {
+                    contains: mentionReference,
+                    mode: 'insensitive',
+                  },
+                },
+              ],
+            },
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: input.limit,
+          })
+        : Promise.resolve([]),
+      campaign?.systemId
+        ? prisma.creature.findMany({
+            where: {
+              systemId: campaign.systemId,
+              OR: [
+                {
+                  isPublic: true,
+                },
+                {
+                  createdBy: input.userId,
+                },
+              ],
+              description: {
+                not: null,
+              },
+              AND: [
+                {
+                  OR: [
+                    {
+                      description: {
+                        contains: wikiLinkReference,
+                        mode: 'insensitive',
+                      },
+                    },
+                    {
+                      description: {
+                        contains: mentionReference,
+                        mode: 'insensitive',
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: input.limit,
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const backlinks: WikiPageRelations['entityBacklinks'] = [
+      ...characters.map((entry) => ({
+        entityType: 'CHARACTER' as const,
+        entityId: entry.id,
+        title: entry.name,
+        excerpt: this.truncateExcerpt(entry.notes),
+        updatedAt: entry.updatedAt,
+      })),
+      ...sessions.map((entry) => ({
+        entityType: 'SESSION' as const,
+        entityId: entry.id,
+        title: entry.summary?.trim().length ? entry.summary : `Sessao ${entry.date.toISOString().slice(0, 10)}`,
+        excerpt: this.truncateExcerpt(entry.narrativeLog) || this.truncateExcerpt(entry.privateGmNotes) || this.truncateExcerpt(entry.summary),
+        updatedAt: entry.updatedAt,
+      })),
+      ...items.map((entry) => ({
+        entityType: 'ITEM' as const,
+        entityId: entry.id,
+        title: entry.name,
+        excerpt: this.truncateExcerpt(entry.description),
+        updatedAt: entry.createdAt,
+      })),
+      ...creatures.map((entry) => ({
+        entityType: 'CREATURE' as const,
+        entityId: entry.id,
+        title: entry.name,
+        excerpt: this.truncateExcerpt(entry.description),
+        updatedAt: entry.createdAt,
+      })),
+    ]
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+      .slice(0, input.limit);
+
+    return backlinks;
+  }
+
+  private extractWikiLinkTitles(content: string): string[] {
+    const titleMap = new Map<string, string>();
+
+    const bracketMatches = content.matchAll(this.WIKI_LINK_PATTERN);
+    for (const match of bracketMatches) {
       const title = match[1]?.trim();
-      if (title) {
-        titleSet.add(title);
+      if (!title) {
+        continue;
+      }
+
+      const normalizedTitle = this.normalizeWikiTitle(title);
+      if (!titleMap.has(normalizedTitle)) {
+        titleMap.set(normalizedTitle, title);
       }
     }
 
-    return [...titleSet];
+    const legacyMatches = content.matchAll(this.LEGACY_MENTION_PATTERN);
+    for (const match of legacyMatches) {
+      const title = match[1]?.trim();
+      if (!title) {
+        continue;
+      }
+
+      const normalizedTitle = this.normalizeWikiTitle(title);
+      if (!titleMap.has(normalizedTitle)) {
+        titleMap.set(normalizedTitle, title);
+      }
+    }
+
+    return [...titleMap.values()];
   }
 
   private sortTree(nodes: WikiTreeNode[]): WikiTreeNode[] {
@@ -466,14 +899,64 @@ export class WikiService {
   async listPages(input: ListWikiPagesInput) {
     const access = await this.getCampaignAccess(input.campaignId, input.userId);
 
-    return prisma.wikiPage.findMany({
-      where: {
+    const baseWhere = {
+      campaignId: access.campaignId,
+      ...(input.category ? { category: input.category } : {}),
+      ...(input.tag ? { tags: { has: input.tag } } : {}),
+      ...this.getVisibilityFilter(access),
+    };
+
+    const trimmedSearch = input.search?.trim();
+    if (trimmedSearch && trimmedSearch.length > 0) {
+      const rankedPageIds = await this.listRankedPageIdsByFullText({
         campaignId: access.campaignId,
-        ...(input.category ? { category: input.category } : {}),
-        ...(input.tag ? { tags: { has: input.tag } } : {}),
-        ...buildSearchFilter(input.search),
-        ...this.getVisibilityFilter(access),
-      },
+        search: trimmedSearch,
+        category: input.category,
+        tag: input.tag,
+        access,
+        limit: input.limit,
+      });
+
+      if (rankedPageIds.length === 0) {
+        return [];
+      }
+
+      const pages = await prisma.wikiPage.findMany({
+        where: {
+          ...baseWhere,
+          id: {
+            in: rankedPageIds,
+          },
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          parent: {
+            select: {
+              id: true,
+              title: true,
+              category: true,
+            },
+          },
+          _count: {
+            select: {
+              children: true,
+            },
+          },
+        },
+      });
+
+      const pagesById = new Map(pages.map((page) => [page.id, page]));
+      return rankedPageIds.map((id) => pagesById.get(id)).filter((page) => page !== undefined);
+    }
+
+    return prisma.wikiPage.findMany({
+      where: baseWhere,
       include: {
         author: {
           select: {
@@ -594,8 +1077,8 @@ export class WikiService {
       throw new AppError(403, 'Only GMs can access private wiki pages');
     }
 
-    const mentionedPageTitles = extractMentionedPageTitles(page.content);
-    const titleSet = new Set(mentionedPageTitles.map((title) => title.toLowerCase()));
+    const linkedPageTitles = this.extractWikiLinkTitles(page.content);
+    const titleSet = new Set(linkedPageTitles.map((title) => this.normalizeWikiTitle(title)));
 
     const candidateLinkedPages = await prisma.wikiPage.findMany({
       where: {
@@ -609,18 +1092,29 @@ export class WikiService {
       },
     });
 
-    const linkedPages = candidateLinkedPages.filter((candidatePage) =>
-      titleSet.has(candidatePage.title.toLowerCase())
-    );
+    const linkedPages = candidateLinkedPages.filter((candidatePage) => {
+      const normalizedCandidateTitle = this.normalizeWikiTitle(candidatePage.title);
+      return titleSet.has(normalizedCandidateTitle);
+    });
 
     const backlinks = await prisma.wikiPage.findMany({
       where: {
         campaignId: page.campaignId,
         id: { not: page.id },
-        content: {
-          contains: `@${page.title}`,
-          mode: 'insensitive',
-        },
+        OR: [
+          {
+            content: {
+              contains: `[[${page.title}]]`,
+              mode: 'insensitive',
+            },
+          },
+          {
+            content: {
+              contains: `@${page.title}`,
+              mode: 'insensitive',
+            },
+          },
+        ],
         ...(access.isGm ? {} : { isPublic: true }),
       },
       select: {
@@ -921,10 +1415,20 @@ export class WikiService {
       where: {
         campaignId: page.campaignId,
         id: { not: page.id },
-        content: {
-          contains: `[[${page.title}]]`,
-          mode: 'insensitive',
-        },
+        OR: [
+          {
+            content: {
+              contains: `[[${page.title}]]`,
+              mode: 'insensitive',
+            },
+          },
+          {
+            content: {
+              contains: `@${page.title}`,
+              mode: 'insensitive',
+            },
+          },
+        ],
         ...visibilityFilter,
       },
       select: {
@@ -944,6 +1448,9 @@ export class WikiService {
       ? await prisma.wikiPage.findMany({
           where: {
             campaignId: page.campaignId,
+            id: {
+              not: page.id,
+            },
             OR: outgoingTitles.map((title) => ({
               title: {
                 equals: title,
@@ -1013,6 +1520,21 @@ export class WikiService {
         }
       : null;
 
+    const [entityBacklinks, outgoingEntities] = await Promise.all([
+      this.findEntityBacklinks({
+        campaignId: page.campaignId,
+        pageTitle: page.title,
+        userId,
+        limit: safeLimit,
+      }),
+      this.findOutgoingEntityLinks({
+        campaignId: page.campaignId,
+        content: page.content,
+        userId,
+        limit: safeLimit,
+      }),
+    ]);
+
     return {
       page: {
         id: page.id,
@@ -1026,6 +1548,8 @@ export class WikiService {
       backlinks,
       outgoingLinks,
       relatedByTag,
+      entityBacklinks,
+      outgoingEntities,
     };
   }
 

@@ -15,12 +15,33 @@ type TabletopToken = {
   size: number;
 };
 
+type TabletopFogState = {
+  cellSize: number;
+  opacity: number;
+  maskedCells: string[];
+};
+
+type TabletopLightSource = {
+  id: string;
+  x: number;
+  y: number;
+  radius: number;
+  intensity: number;
+  color: string;
+};
+
 type TabletopState = {
   mapImageUrl: string | null;
   gridSize: number;
   tokens: TabletopToken[];
+  fog: TabletopFogState;
+  lights: TabletopLightSource[];
   updatedAt: string;
   updatedBy: string;
+};
+
+type TabletopStatePatch = Partial<Omit<TabletopState, 'fog'>> & {
+  fog?: Partial<TabletopFogState>;
 };
 
 type TabletopStateEvent = {
@@ -72,6 +93,69 @@ type TabletopStateEvent = {
 
           <hr />
 
+          <h3>Fog of War</h3>
+          <div class="toolbar-row">
+            <button class="btn btn-outline btn-sm" (click)="fogEditMode = !fogEditMode">
+              {{ fogEditMode ? 'Pincel ativo' : 'Ativar pincel' }}
+            </button>
+            <button class="btn btn-outline btn-sm" (click)="setFogBrushMode('mask')" [disabled]="fogBrushMode === 'mask'">
+              Esconder
+            </button>
+            <button class="btn btn-outline btn-sm" (click)="setFogBrushMode('reveal')" [disabled]="fogBrushMode === 'reveal'">
+              Revelar
+            </button>
+          </div>
+
+          <label class="field-label">Opacidade: {{ state.fog.opacity | number:'1.2-2' }}</label>
+          <input
+            type="range"
+            min="0.15"
+            max="0.95"
+            step="0.05"
+            class="form-control"
+            [ngModel]="state.fog.opacity"
+            (ngModelChange)="updateFogOpacity($event)"
+          />
+
+          <button class="btn btn-danger btn-sm" (click)="clearFog()" [disabled]="state.fog.maskedCells.length === 0">
+            Limpar Fog
+          </button>
+
+          <hr />
+
+          <h3>Iluminacao Dinamica</h3>
+          <div class="toolbar-row">
+            <button class="btn btn-primary btn-sm" (click)="addLightSource()">+ Luz</button>
+            <button class="btn btn-danger btn-sm" (click)="removeSelectedLightSource()" [disabled]="!selectedLightId">
+              Remover
+            </button>
+          </div>
+
+          <div class="token-list" *ngIf="state.lights.length > 0">
+            <button
+              *ngFor="let light of state.lights"
+              class="token-item"
+              [class.active]="selectedLightId === light.id"
+              (click)="selectLight(light.id)"
+            >
+              <span class="dot" [style.background]="light.color"></span>
+              <span>Luz {{ light.id.slice(-4) }}</span>
+            </button>
+          </div>
+
+          <div *ngIf="selectedLight as light" class="token-editor">
+            <label class="field-label">Raio: {{ light.radius }} px</label>
+            <input type="range" min="60" max="1200" step="10" class="form-control" [ngModel]="light.radius" (ngModelChange)="updateLightRadius($event)" />
+
+            <label class="field-label">Intensidade: {{ light.intensity | number:'1.2-2' }}</label>
+            <input type="range" min="0.15" max="1" step="0.05" class="form-control" [ngModel]="light.intensity" (ngModelChange)="updateLightIntensity($event)" />
+
+            <label class="field-label">Cor</label>
+            <input type="color" class="color-input" [ngModel]="light.color" (ngModelChange)="updateLightColor($event)" />
+          </div>
+
+          <hr />
+
           <h3>Tokens</h3>
           <div class="toolbar-row">
             <button class="btn btn-primary btn-sm" (click)="addToken()">+ Token</button>
@@ -113,9 +197,31 @@ type TabletopStateEvent = {
         </aside>
 
         <section class="card map-shell">
-          <div class="map-stage" #stage>
+          <div class="map-stage" #stage [class.fog-editing]="fogEditMode" (click)="onStageClick($event)">
             <div class="map-bg" *ngIf="state.mapImageUrl" [style.background-image]="mapBackground"></div>
             <div class="map-grid" [style.background-size]="gridBackgroundSize"></div>
+
+            <div
+              *ngFor="let light of state.lights"
+              class="light-beacon"
+              [style.left.px]="light.x"
+              [style.top.px]="light.y"
+              [style.width.px]="light.radius * 2"
+              [style.height.px]="light.radius * 2"
+              [style.background]="buildLightGradient(light)"
+              [style.opacity]="light.intensity"
+            ></div>
+
+            <div class="fog-layer" [style.opacity]="state.fog.opacity">
+              <div
+                class="fog-cell"
+                *ngFor="let cell of fogCells"
+                [style.left.px]="cell.left"
+                [style.top.px]="cell.top"
+                [style.width.px]="cell.size"
+                [style.height.px]="cell.size"
+              ></div>
+            </div>
 
             <button
               *ngFor="let token of state.tokens"
@@ -238,6 +344,9 @@ type TabletopStateEvent = {
         overflow: hidden;
         background: #0d0d12;
       }
+      .map-stage.fog-editing {
+        cursor: crosshair;
+      }
       .map-bg,
       .map-grid {
         position: absolute;
@@ -252,6 +361,25 @@ type TabletopStateEvent = {
         background-image:
           linear-gradient(to right, rgba(255, 255, 255, 0.09) 1px, transparent 1px),
           linear-gradient(to bottom, rgba(255, 255, 255, 0.09) 1px, transparent 1px);
+      }
+      .light-beacon {
+        position: absolute;
+        transform: translate(-50%, -50%);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 4;
+        mix-blend-mode: screen;
+      }
+      .fog-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 5;
+      }
+      .fog-cell {
+        position: absolute;
+        background: rgba(0, 0, 0, 0.96);
+        border: 1px solid rgba(10, 10, 10, 0.25);
       }
       .token {
         position: absolute;
@@ -293,11 +421,20 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   connectedLabel = 'Realtime desconectado';
   draftMapUrl = '';
   selectedTokenId: string | null = null;
+  selectedLightId: string | null = null;
+  fogEditMode = false;
+  fogBrushMode: 'mask' | 'reveal' = 'mask';
 
   state: TabletopState = {
     mapImageUrl: null,
     gridSize: 56,
     tokens: [],
+    fog: {
+      cellSize: 56,
+      opacity: 0.72,
+      maskedCells: [],
+    },
+    lights: [],
     updatedAt: '',
     updatedBy: '',
   };
@@ -324,6 +461,26 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
     return this.state.tokens.find((token) => token.id === this.selectedTokenId);
   }
 
+  get selectedLight(): TabletopLightSource | undefined {
+    return this.state.lights.find((light) => light.id === this.selectedLightId);
+  }
+
+  get fogCells(): Array<{ key: string; left: number; top: number; size: number }> {
+    const size = this.state.fog.cellSize || this.state.gridSize;
+
+    return this.state.fog.maskedCells.map((key) => {
+      const [xRaw, yRaw] = key.split(':');
+      const x = Number(xRaw);
+      const y = Number(yRaw);
+      return {
+        key,
+        left: x * size,
+        top: y * size,
+        size,
+      };
+    });
+  }
+
   ngOnInit(): void {
     this.campaignId = this.route.snapshot.paramMap.get('id') || '';
     if (!this.campaignId) {
@@ -342,7 +499,7 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
         }
 
         this.connectedLabel = 'Realtime conectado';
-        this.state = event.state;
+        this.state = this.normalizeState(event.state);
         this.draftMapUrl = this.state.mapImageUrl || '';
       });
 
@@ -372,6 +529,139 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   clearMap(): void {
     this.draftMapUrl = '';
     this.pushState({ mapImageUrl: null });
+  }
+
+  onStageClick(event: MouseEvent): void {
+    if (!this.fogEditMode) {
+      return;
+    }
+
+    const stageElement = this.stageRef?.nativeElement;
+    if (!stageElement) {
+      return;
+    }
+
+    const rect = stageElement.getBoundingClientRect();
+    const localX = event.clientX - rect.left;
+    const localY = event.clientY - rect.top;
+
+    const size = this.state.fog.cellSize || this.state.gridSize;
+    const cellX = Math.max(0, Math.floor(localX / size));
+    const cellY = Math.max(0, Math.floor(localY / size));
+    const key = `${cellX}:${cellY}`;
+
+    const set = new Set(this.state.fog.maskedCells);
+    if (this.fogBrushMode === 'mask') {
+      set.add(key);
+    } else {
+      set.delete(key);
+    }
+
+    this.pushState({
+      fog: {
+        maskedCells: Array.from(set),
+      },
+    });
+  }
+
+  setFogBrushMode(mode: 'mask' | 'reveal'): void {
+    this.fogBrushMode = mode;
+  }
+
+  updateFogOpacity(value: number | string): void {
+    const opacity = Number(value);
+    if (!Number.isFinite(opacity)) {
+      return;
+    }
+
+    this.pushState({
+      fog: {
+        opacity: Math.max(0.15, Math.min(0.95, opacity)),
+      },
+    });
+  }
+
+  clearFog(): void {
+    this.pushState({
+      fog: {
+        maskedCells: [],
+      },
+    });
+  }
+
+  addLightSource(): void {
+    const stageElement = this.stageRef?.nativeElement;
+    const x = stageElement ? stageElement.clientWidth / 2 : 280;
+    const y = stageElement ? stageElement.clientHeight / 2 : 220;
+    const light: TabletopLightSource = {
+      id: `light_${Date.now()}_${Math.round(Math.random() * 9999)}`,
+      x,
+      y,
+      radius: 220,
+      intensity: 0.8,
+      color: '#ffe2a8',
+    };
+
+    this.selectedLightId = light.id;
+    this.pushState({
+      lights: [...this.state.lights, light],
+    });
+    this.socketService.emit('campaign:tabletop:light:upsert', {
+      campaignId: this.campaignId,
+      light,
+    });
+  }
+
+  selectLight(lightId: string): void {
+    this.selectedLightId = lightId;
+  }
+
+  removeSelectedLightSource(): void {
+    if (!this.selectedLightId) {
+      return;
+    }
+
+    const lightId = this.selectedLightId;
+    this.selectedLightId = null;
+    this.pushState({
+      lights: this.state.lights.filter((entry) => entry.id !== lightId),
+    });
+    this.socketService.emit('campaign:tabletop:light:remove', {
+      campaignId: this.campaignId,
+      lightId,
+    });
+  }
+
+  updateLightRadius(value: number | string): void {
+    const selected = this.selectedLight;
+    const nextRadius = Number(value);
+    if (!selected || !Number.isFinite(nextRadius)) {
+      return;
+    }
+
+    this.updateLight({ radius: Math.max(60, Math.min(1200, Math.round(nextRadius))) });
+  }
+
+  updateLightIntensity(value: number | string): void {
+    const selected = this.selectedLight;
+    const nextIntensity = Number(value);
+    if (!selected || !Number.isFinite(nextIntensity)) {
+      return;
+    }
+
+    this.updateLight({ intensity: Math.max(0.15, Math.min(1, nextIntensity)) });
+  }
+
+  updateLightColor(color: string): void {
+    if (!this.selectedLight) {
+      return;
+    }
+
+    this.updateLight({ color });
+  }
+
+  buildLightGradient(light: TabletopLightSource): string {
+    return `radial-gradient(circle, ${light.color} 0%, rgba(255, 234, 180, 0.08) 45%, rgba(0,0,0,0) 100%)`;
   }
 
   updateGridSize(value: number | string): void {
@@ -510,10 +800,21 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
     this.pushState({ tokens: this.state.tokens });
   };
 
-  private pushState(patch: Partial<TabletopState>): void {
+  private pushState(patch: TabletopStatePatch): void {
+    const nextFog =
+      patch.fog === undefined
+        ? this.state.fog
+        : {
+            ...this.state.fog,
+            ...patch.fog,
+            maskedCells: patch.fog.maskedCells ?? this.state.fog.maskedCells,
+          };
+
     this.state = {
       ...this.state,
       ...patch,
+      fog: nextFog,
+      lights: patch.lights ?? this.state.lights,
       updatedAt: new Date().toISOString(),
     };
 
@@ -521,5 +822,45 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
       campaignId: this.campaignId,
       ...patch,
     });
+  }
+
+  private updateLight(patch: Partial<TabletopLightSource>): void {
+    const selected = this.selectedLight;
+    if (!selected) {
+      return;
+    }
+
+    const updatedLight: TabletopLightSource = {
+      ...selected,
+      ...patch,
+    };
+
+    const lights = this.state.lights.map((entry) =>
+      entry.id === updatedLight.id ? updatedLight : entry
+    );
+
+    this.pushState({ lights });
+    this.socketService.emit('campaign:tabletop:light:upsert', {
+      campaignId: this.campaignId,
+      light: updatedLight,
+    });
+  }
+
+  private normalizeState(state: TabletopState): TabletopState {
+    const fog = state.fog || {
+      cellSize: state.gridSize,
+      opacity: 0.72,
+      maskedCells: [],
+    };
+
+    return {
+      ...state,
+      fog: {
+        cellSize: fog.cellSize || state.gridSize,
+        opacity: fog.opacity ?? 0.72,
+        maskedCells: Array.isArray(fog.maskedCells) ? fog.maskedCells : [],
+      },
+      lights: Array.isArray(state.lights) ? state.lights : [],
+    };
   }
 }

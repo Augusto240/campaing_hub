@@ -17,6 +17,7 @@ import wikiRoutes from './modules/wiki/wiki.routes';
 import combatRoutes from './modules/combat/combat.routes';
 import creatureRoutes from './modules/creatures/creature.routes';
 import sessionProposalRoutes from './modules/session-proposals/proposal.routes';
+import compendiumRoutes from './modules/compendium/compendium.routes';
 import {
   canAccessMetrics,
   metricsMiddleware,
@@ -99,6 +100,7 @@ export const createApp = () => {
   app.use('/api/combat', combatRoutes);
   app.use('/api/creatures', creatureRoutes);
   app.use('/api/session-proposals', sessionProposalRoutes);
+  app.use('/api/compendium', compendiumRoutes);
 
   app.use(errorMiddleware);
 

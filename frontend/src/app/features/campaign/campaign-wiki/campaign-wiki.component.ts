@@ -1,14 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+﻿import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
-<<<<<<< HEAD
-import { WikiCategory, WikiService } from '../../../core/services/wiki.service';
-import { WikiPage, WikiPageReference, WikiTreeNode } from '../../../core/types';
-
-interface TreeRow {
-=======
 import { WikiService } from '../../../core/services/wiki.service';
 import {
   WikiBlock,
@@ -32,25 +26,10 @@ type WikiPageView = WikiPage & {
 };
 
 type FlatTreeNode = {
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
   id: string;
   title: string;
   category: WikiCategory;
   isPublic: boolean;
-<<<<<<< HEAD
-  parentPageId: string | null;
-  depth: number;
-}
-
-interface WikiEditorForm {
-  title: string;
-  content: string;
-  category: WikiCategory;
-  tagsInput: string;
-  isPublic: boolean;
-  parentPageId: string;
-}
-=======
   depth: number;
 };
 
@@ -62,7 +41,6 @@ type EditableWikiBlock = {
     checklistText?: string;
   };
 };
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
 
 @Component({
   selector: 'app-campaign-wiki',
@@ -71,73 +49,51 @@ type EditableWikiBlock = {
   template: `
     <div class="container wiki-wrapper">
       <div class="wiki-header">
-        <a class="back-link" [routerLink]="['/campaigns', campaignId]">← Voltar para campanha</a>
-        <h1>Wiki da Campanha - Nexus de Conhecimento</h1>
-        <p>
-          Estrutura hierarquica, links internos com &#64; e importacao canonica do legado 2023.
-        </p>
-      </div>
-
-      <div
-        class="flash"
-        *ngIf="flashMessage"
-        [class.error]="flashType === 'error'"
-        [class.success]="flashType === 'success'"
-      >
-        {{ flashMessage }}
+        <a class="back-link" [routerLink]="['/campaigns', campaignId]">ÔåÉ Voltar para campanha</a>
+        <h1>Wiki da Campanha</h1>
       </div>
 
       <div class="wiki-toolbar">
         <input
           class="form-control"
-          placeholder="Buscar por titulo ou conteudo..."
+          placeholder="Buscar por t├¡tulo ou conte├║do..."
           [(ngModel)]="searchTerm"
-          (keyup.enter)="loadData(false)"
+          (keyup.enter)="loadPages()"
         />
-        <select class="form-control" [(ngModel)]="selectedCategory" (change)="loadData(false)">
+        <select class="form-control" [(ngModel)]="selectedCategory" (change)="loadPages()">
           <option value="">Todas as categorias</option>
           <option *ngFor="let c of categories" [value]="c">{{ c }}</option>
         </select>
-<<<<<<< HEAD
-        <button class="btn btn-outline" (click)="loadData(false)">Filtrar</button>
-        <button class="btn btn-outline" [disabled]="seeding" (click)="seedLegacy()">
-          {{ seeding ? 'Importando legado...' : 'Importar legado 2023' }}
-        </button>
-        <button class="btn btn-primary" (click)="startCreate()">+ Nova Pagina</button>
-      </div>
-
-      <div class="loading" *ngIf="loading">Carregando wiki...</div>
-=======
         <button class="btn btn-outline" (click)="loadPages()">Filtrar</button>
         <button class="btn btn-outline" (click)="bootstrapLegacy()" [disabled]="bootstrappingLegacy">
           {{ bootstrappingLegacy ? 'Importando legado...' : 'Importar Legado 2023' }}
         </button>
         <button class="btn btn-outline" (click)="openTemplateCreator()">Usar Template</button>
-        <button class="btn btn-primary" (click)="startCreate()">+ Nova Página</button>
+        <button class="btn btn-primary" (click)="startCreate()">+ Nova P├ígina</button>
       </div>
 
       <div class="template-box card" *ngIf="templateCreatorVisible">
         <div class="editor-head">
-          <h3>Nova Página por Template</h3>
+          <h3>Nova P├ígina por Template</h3>
           <button class="btn btn-outline btn-sm" (click)="templateCreatorVisible = false">Fechar</button>
         </div>
 
         <div class="editor-form">
-          <input class="form-control" placeholder="Título da nova página" [(ngModel)]="templateForm.title" />
+          <input class="form-control" placeholder="T├¡tulo da nova p├ígina" [(ngModel)]="templateForm.title" />
           <select class="form-control" [(ngModel)]="templateForm.templateKey">
             <option *ngFor="let template of templates" [value]="template.key">
               {{ template.name }}
             </option>
           </select>
           <select class="form-control" [(ngModel)]="templateForm.parentPageId">
-            <option value="">Sem página mãe (raiz)</option>
+            <option value="">Sem p├ígina m├úe (raiz)</option>
             <option *ngFor="let option of getParentOptions()" [value]="option.id">
               {{ formatTreeOption(option) }}
             </option>
           </select>
           <label class="checkbox-label">
             <input type="checkbox" [(ngModel)]="templateForm.isPublic" />
-            Visível para jogadores
+            Vis├¡vel para jogadores
           </label>
         </div>
 
@@ -146,7 +102,7 @@ type EditableWikiBlock = {
           [disabled]="!templateForm.title || creatingFromTemplate"
           (click)="createFromTemplate()"
         >
-          {{ creatingFromTemplate ? 'Criando...' : 'Criar Página com Template' }}
+          {{ creatingFromTemplate ? 'Criando...' : 'Criar P├ígina com Template' }}
         </button>
       </div>
 
@@ -156,12 +112,20 @@ type EditableWikiBlock = {
 
       <div class="wiki-grid" *ngIf="!loading">
         <div class="wiki-list card">
-          <div class="list-title">Árvore da Wiki Viva</div>
+          <div class="list-title">├ürvore da Wiki Viva</div>
+
+          <div
+            class="drop-root"
+            (dragover)="onTreeDragOver($event)"
+            (drop)="onTreeDropOnRoot($event)"
+          >
+            Solte aqui para mover para raiz
+          </div>
 
           <div class="favorites-box" *ngIf="favorites.length > 0">
             <div class="section-label">Favoritos</div>
             <button class="wiki-list-item" *ngFor="let favorite of favorites" (click)="openPageById(favorite.page.id)">
-              <div class="title">★ {{ favorite.page.title }}</div>
+              <div class="title">Ôÿà {{ favorite.page.title }}</div>
             </button>
           </div>
 
@@ -169,6 +133,11 @@ type EditableWikiBlock = {
             *ngFor="let node of getVisibleTreeNodes()"
             class="wiki-list-item"
             [class.active]="selectedPage?.id === node.id"
+            [class.moving]="draggingNodeId === node.id"
+            draggable="true"
+            (dragstart)="onTreeDragStart(node.id)"
+            (dragover)="onTreeDragOver($event)"
+            (drop)="onTreeDropOnNode(node.id, $event)"
             (click)="openPageById(node.id)"
           >
             <div class="title" [style.padding-left.px]="node.depth * 18">{{ node.title }}</div>
@@ -177,78 +146,36 @@ type EditableWikiBlock = {
               <span *ngIf="!node.isPublic" class="badge badge-warning">GM</span>
             </div>
           </button>
-          <div class="empty" *ngIf="getVisibleTreeNodes().length === 0">Nenhuma página encontrada.</div>
+          <div class="empty" *ngIf="getVisibleTreeNodes().length === 0">Nenhuma p├ígina encontrada.</div>
         </div>
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
 
-      <div class="wiki-grid" *ngIf="!loading">
-        <aside class="wiki-list card">
-          <div class="list-title">Arvore de Paginas</div>
-          <button
-            *ngFor="let row of treeRows"
-            class="tree-item"
-            [class.active]="selectedPage?.id === row.id"
-            [style.padding-left.px]="12 + row.depth * 18"
-            (click)="openPageById(row.id)"
-          >
-            <span class="tree-title">{{ row.title }}</span>
-            <span class="tree-meta">{{ row.category }}</span>
-            <span *ngIf="!row.isPublic" class="badge badge-warning">GM</span>
-            <span class="tree-actions">
-              <span class="tree-add" (click)="startCreate(row.id); $event.stopPropagation()">+</span>
-            </span>
-          </button>
-          <div class="empty" *ngIf="treeRows.length === 0">Nenhuma pagina encontrada.</div>
-        </aside>
-
-        <section class="wiki-editor card" *ngIf="editorVisible">
+        <div class="wiki-editor card" *ngIf="editorVisible">
           <div class="editor-head">
-<<<<<<< HEAD
-            <h3>{{ isEditing ? 'Editar pagina' : 'Nova pagina' }}</h3>
-            <div class="editor-head-actions">
-              <button class="btn btn-outline btn-sm" *ngIf="selectedPage" (click)="startCreate(selectedPage.id)">
-                + Subpagina
-=======
-            <h3>{{ isEditing ? 'Editar página' : 'Nova página' }}</h3>
+            <h3>{{ isEditing ? 'Editar p├ígina' : 'Nova p├ígina' }}</h3>
             <div class="editor-head-actions">
               <button class="btn btn-outline btn-sm" *ngIf="isEditing && selectedPage" (click)="toggleFavorite()">
-                {{ isSelectedFavorite() ? '★ Favorita' : '☆ Favoritar' }}
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
+                {{ isSelectedFavorite() ? 'Ôÿà Favorita' : 'Ôÿå Favoritar' }}
               </button>
               <button class="btn btn-danger btn-sm" *ngIf="isEditing" (click)="deletePage()">Excluir</button>
             </div>
           </div>
 
           <div class="editor-form">
-            <input class="form-control" placeholder="Titulo" [(ngModel)]="form.title" />
+            <input class="form-control" placeholder="T├¡tulo" [(ngModel)]="form.title" />
             <select class="form-control" [(ngModel)]="form.category">
               <option *ngFor="let c of categories" [value]="c">{{ c }}</option>
             </select>
             <select class="form-control" [(ngModel)]="form.parentPageId">
-<<<<<<< HEAD
-              <option value="">Sem pagina pai (raiz)</option>
-              <option *ngFor="let page of availableParents" [value]="page.id">{{ page.title }}</option>
-            </select>
-            <input class="form-control" placeholder="Tags (separadas por virgula)" [(ngModel)]="form.tagsInput" />
-=======
-              <option value="">Sem página mãe (raiz)</option>
+              <option value="">Sem p├ígina m├úe (raiz)</option>
               <option *ngFor="let option of getParentOptions()" [value]="option.id">
                 {{ formatTreeOption(option) }}
               </option>
             </select>
-            <input class="form-control" placeholder="Tags (separadas por vírgula)" [(ngModel)]="form.tagsInput" />
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
+            <input class="form-control" placeholder="Tags (separadas por v├¡rgula)" [(ngModel)]="form.tagsInput" />
             <label class="checkbox-label">
               <input type="checkbox" [(ngModel)]="form.isPublic" />
-              Visivel para jogadores
+              Vis├¡vel para jogadores
             </label>
-            <div class="internal-link-row">
-              <select class="form-control" [(ngModel)]="internalLinkTarget">
-                <option value="">Inserir link interno com &#64;...</option>
-                <option *ngFor="let page of pages" [value]="page.title">{{ page.title }}</option>
-              </select>
-              <button class="btn btn-outline" (click)="insertInternalLink()">Inserir &#64;link</button>
-            </div>
           </div>
 
           <div class="markdown-layout" *ngIf="!blockEditorMode">
@@ -258,7 +185,7 @@ type EditableWikiBlock = {
                 class="form-control editor-textarea"
                 rows="14"
                 [(ngModel)]="form.content"
-                placeholder="Escreva o conteudo da wiki em markdown e use &#64;NomeDaPagina para links internos..."
+                placeholder="Escreva o conte├║do da wiki em markdown..."
               ></textarea>
             </div>
             <div>
@@ -267,22 +194,6 @@ type EditableWikiBlock = {
             </div>
           </div>
 
-<<<<<<< HEAD
-          <div class="references" *ngIf="isEditing && selectedPage">
-            <div>
-              <h4>Paginas citadas</h4>
-              <p class="empty" *ngIf="linkedPages.length === 0">Nenhuma ligacao interna encontrada.</p>
-              <button *ngFor="let link of linkedPages" class="ref-chip" (click)="openPageById(link.id)">
-                &#64;{{ link.title }}
-              </button>
-            </div>
-            <div>
-              <h4>Backlinks</h4>
-              <p class="empty" *ngIf="backlinks.length === 0">Nenhuma pagina aponta para esta entrada.</p>
-              <button *ngFor="let link of backlinks" class="ref-chip" (click)="openPageById(link.id)">
-                {{ link.title }}
-              </button>
-=======
           <div class="blocks-layout" *ngIf="blockEditorMode">
             <div class="section-label">Blocos (Notion interno)</div>
             <div class="block-item" *ngFor="let block of blocks; let i = index">
@@ -312,8 +223,8 @@ type EditableWikiBlock = {
               ></textarea>
 
               <div class="block-actions">
-                <button class="btn btn-outline btn-sm" (click)="moveBlock(i, -1)" [disabled]="i === 0">↑</button>
-                <button class="btn btn-outline btn-sm" (click)="moveBlock(i, 1)" [disabled]="i === blocks.length - 1">↓</button>
+                <button class="btn btn-outline btn-sm" (click)="moveBlock(i, -1)" [disabled]="i === 0">Ôåæ</button>
+                <button class="btn btn-outline btn-sm" (click)="moveBlock(i, 1)" [disabled]="i === blocks.length - 1">Ôåô</button>
                 <button class="btn btn-danger btn-sm" (click)="removeBlock(i)">Remover</button>
               </div>
             </div>
@@ -325,7 +236,6 @@ type EditableWikiBlock = {
               <button class="btn btn-outline" (click)="addBlock('QUOTE')">+ Quote</button>
               <button class="btn btn-outline" (click)="addBlock('CODE')">+ Code</button>
               <button class="btn btn-outline" (click)="addBlock('IMAGE')">+ Imagem</button>
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
             </div>
           </div>
 
@@ -343,12 +253,12 @@ type EditableWikiBlock = {
           </div>
 
           <div class="relations-panel" *ngIf="isEditing && selectedPage">
-            <div class="section-label">Conexões da Página</div>
-            <div class="loading-mini" *ngIf="loadingRelations">Carregando conexões...</div>
+            <div class="section-label">Conex├Áes da P├ígina</div>
+            <div class="loading-mini" *ngIf="loadingRelations">Carregando conex├Áes...</div>
 
             <div class="relations-grid" *ngIf="!loadingRelations && relations">
               <div class="relation-card">
-                <h4>Página mãe</h4>
+                <h4>P├ígina m├úe</h4>
                 <button
                   class="link-chip"
                   *ngIf="relations.parent"
@@ -356,7 +266,7 @@ type EditableWikiBlock = {
                 >
                   {{ relations.parent.title }}
                 </button>
-                <div class="empty" *ngIf="!relations.parent">Página raiz</div>
+                <div class="empty" *ngIf="!relations.parent">P├ígina raiz</div>
               </div>
 
               <div class="relation-card">
@@ -368,7 +278,7 @@ type EditableWikiBlock = {
                 >
                   {{ child.title }}
                 </button>
-                <div class="empty" *ngIf="relations.children.length === 0">Nenhuma subpágina</div>
+                <div class="empty" *ngIf="relations.children.length === 0">Nenhuma subp├ígina</div>
               </div>
 
               <div class="relation-card">
@@ -384,7 +294,7 @@ type EditableWikiBlock = {
               </div>
 
               <div class="relation-card">
-                <h4>Links de saída</h4>
+                <h4>Links de sa├¡da</h4>
                 <button
                   class="link-chip"
                   *ngFor="let ref of relations.outgoingLinks"
@@ -396,7 +306,7 @@ type EditableWikiBlock = {
               </div>
 
               <div class="relation-card relation-card-wide">
-                <h4>Páginas relacionadas por tags</h4>
+                <h4>P├íginas relacionadas por tags</h4>
                 <button
                   class="link-chip"
                   *ngFor="let ref of relations.relatedByTag"
@@ -406,17 +316,34 @@ type EditableWikiBlock = {
                   <span class="shared-tags">({{ ref.sharedTags.join(', ') }})</span>
                 </button>
                 <div class="empty" *ngIf="relations.relatedByTag.length === 0">
-                  Nenhuma página relacionada por tags
+                  Nenhuma p├ígina relacionada por tags
+                </div>
+              </div>
+
+              <div class="relation-card relation-card-wide">
+                <h4>Backlinks de Entidades</h4>
+                <div class="link-chip static-chip" *ngFor="let ref of relations.entityBacklinks">
+                  <strong>{{ ref.title }}</strong>
+                  <span class="entity-meta">{{ ref.entityType }} · {{ ref.excerpt || 'Sem resumo' }}</span>
+                </div>
+                <div class="empty" *ngIf="relations.entityBacklinks.length === 0">
+                  Nenhuma entidade faz referencia a esta pagina
+                </div>
+              </div>
+
+              <div class="relation-card relation-card-wide">
+                <h4>Entidades Citadas na Pagina</h4>
+                <div class="link-chip static-chip" *ngFor="let ref of relations.outgoingEntities">
+                  <strong>{{ ref.title }}</strong>
+                  <span class="entity-meta">{{ ref.entityType }}</span>
+                </div>
+                <div class="empty" *ngIf="relations.outgoingEntities.length === 0">
+                  Nenhuma entidade citada com &#64; ou [[...]]
                 </div>
               </div>
             </div>
           </div>
-        </section>
-
-        <section class="wiki-empty card" *ngIf="!editorVisible">
-          <h3>Selecione uma pagina</h3>
-          <p>Abra uma pagina da arvore ou crie uma nova entrada para comecar.</p>
-        </section>
+        </div>
       </div>
     </div>
   `,
@@ -428,26 +355,6 @@ type EditableWikiBlock = {
       }
       .wiki-header {
         margin-bottom: 1rem;
-      }
-      .wiki-header p {
-        margin-top: 0.35rem;
-        color: var(--text-secondary);
-      }
-      .flash {
-        border: 1px solid rgba(201, 168, 76, 0.4);
-        border-radius: var(--radius-sm);
-        background: rgba(201, 168, 76, 0.1);
-        color: var(--text-primary);
-        padding: 0.6rem 0.8rem;
-        margin-bottom: 0.8rem;
-      }
-      .flash.success {
-        border-color: rgba(39, 174, 96, 0.45);
-        background: rgba(39, 174, 96, 0.12);
-      }
-      .flash.error {
-        border-color: rgba(231, 76, 60, 0.45);
-        background: rgba(231, 76, 60, 0.12);
       }
       .back-link {
         color: var(--text-secondary);
@@ -462,17 +369,13 @@ type EditableWikiBlock = {
       }
       .wiki-toolbar {
         display: grid;
-        grid-template-columns: 2fr 1fr auto auto auto;
+        grid-template-columns: 2fr 1fr auto auto;
         gap: 0.75rem;
         margin-bottom: 1rem;
       }
-      .loading {
-        color: var(--text-secondary);
-        padding: 1rem;
-      }
       .wiki-grid {
         display: grid;
-        grid-template-columns: 320px 1fr;
+        grid-template-columns: 300px 1fr;
         gap: 1rem;
       }
       .legacy-feedback {
@@ -497,51 +400,52 @@ type EditableWikiBlock = {
         font-weight: 700;
         margin-bottom: 0.75rem;
       }
-<<<<<<< HEAD
-      .tree-item {
-=======
+      .drop-root {
+        border: 1px dashed rgba(201, 168, 76, 0.5);
+        border-radius: var(--radius-sm);
+        color: var(--text-secondary);
+        font-size: 0.78rem;
+        padding: 0.5rem 0.6rem;
+        margin-bottom: 0.75rem;
+        text-align: center;
+      }
       .favorites-box {
         border-bottom: 1px solid var(--border-color);
         margin-bottom: 0.75rem;
         padding-bottom: 0.75rem;
       }
       .wiki-list-item {
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
         width: 100%;
         text-align: left;
         border: 1px solid var(--border-color);
         border-radius: var(--radius-sm);
         background: rgba(255, 255, 255, 0.02);
-        padding: 0.55rem 0.55rem 0.55rem 0.65rem;
-        margin-bottom: 0.45rem;
+        padding: 0.65rem;
+        margin-bottom: 0.5rem;
         color: var(--text-primary);
         cursor: pointer;
-        display: grid;
-        grid-template-columns: 1fr auto auto auto;
-        align-items: center;
-        gap: 0.45rem;
       }
-      .tree-item.active {
+      .wiki-list-item.active {
         border-color: var(--accent-primary);
         background: rgba(201, 168, 76, 0.08);
       }
-      .tree-title {
+      .wiki-list-item.moving {
+        opacity: 0.55;
+      }
+      .wiki-list-item .title {
+        font-size: 0.9rem;
         font-weight: 600;
       }
-      .tree-meta {
+      .wiki-list-item .meta {
+        font-size: 0.75rem;
         color: var(--text-muted);
-        font-size: 0.72rem;
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        margin-top: 0.25rem;
       }
-      .tree-actions {
-        display: inline-flex;
-      }
-      .tree-add {
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        display: inline-grid;
-        place-items: center;
-        border: 1px solid rgba(255, 255, 255, 0.2);
+      .empty {
+        color: var(--text-muted);
         font-size: 0.85rem;
       }
       .editor-head {
@@ -570,12 +474,6 @@ type EditableWikiBlock = {
         color: var(--text-secondary);
         font-size: 0.85rem;
       }
-      .internal-link-row {
-        grid-column: 1 / -1;
-        display: grid;
-        grid-template-columns: 1fr auto;
-        gap: 0.5rem;
-      }
       .markdown-layout {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -599,29 +497,6 @@ type EditableWikiBlock = {
         color: var(--text-primary);
         white-space: pre-wrap;
       }
-      .preview-box .wiki-link-ref {
-        color: var(--accent-primary);
-        font-weight: 700;
-      }
-      .references {
-        margin-top: 0.85rem;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.75rem;
-      }
-      .references h4 {
-        margin: 0 0 0.4rem;
-        font-size: 0.9rem;
-      }
-      .ref-chip {
-        border: 1px solid rgba(201, 168, 76, 0.35);
-        border-radius: 999px;
-        background: rgba(201, 168, 76, 0.1);
-        color: var(--text-primary);
-        padding: 0.24rem 0.6rem;
-        margin: 0 0.35rem 0.35rem 0;
-        cursor: pointer;
-      }
       .editor-actions {
         margin-top: 1rem;
         display: flex;
@@ -629,23 +504,6 @@ type EditableWikiBlock = {
         flex-wrap: wrap;
         gap: 0.5rem;
       }
-<<<<<<< HEAD
-      .wiki-empty {
-        min-height: 260px;
-        display: grid;
-        place-content: center;
-        text-align: center;
-      }
-      .empty {
-        color: var(--text-muted);
-        font-size: 0.85rem;
-      }
-      @media (max-width: 1200px) {
-        .wiki-toolbar {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-=======
       .blocks-layout {
         border: 1px solid var(--border-color);
         border-radius: var(--radius-sm);
@@ -710,6 +568,18 @@ type EditableWikiBlock = {
       .link-chip:hover {
         border-color: var(--accent-primary);
       }
+      .static-chip {
+        cursor: default;
+      }
+      .static-chip:hover {
+        border-color: var(--border-color);
+      }
+      .entity-meta {
+        display: block;
+        margin-top: 0.2rem;
+        font-size: 0.74rem;
+        color: var(--text-muted);
+      }
       .shared-tags {
         color: var(--text-muted);
         margin-left: 0.3rem;
@@ -719,15 +589,15 @@ type EditableWikiBlock = {
         color: var(--text-muted);
         font-size: 0.85rem;
       }
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
       @media (max-width: 1024px) {
         .wiki-grid {
           grid-template-columns: 1fr;
         }
+        .wiki-toolbar {
+          grid-template-columns: 1fr;
+        }
         .editor-form,
-        .markdown-layout,
-        .references,
-        .internal-link-row {
+        .markdown-layout {
           grid-template-columns: 1fr;
         }
         .relations-grid {
@@ -740,17 +610,6 @@ type EditableWikiBlock = {
 export class CampaignWikiComponent implements OnInit {
   campaignId = '';
   loading = true;
-<<<<<<< HEAD
-  seeding = false;
-
-  pages: WikiPage[] = [];
-  treeRows: TreeRow[] = [];
-  selectedPage: WikiPage | null = null;
-  selectedPageId: string | null = null;
-
-  linkedPages: WikiPageReference[] = [];
-  backlinks: WikiPageReference[] = [];
-=======
   pages: WikiPageView[] = [];
   tree: WikiTreeNode[] = [];
   flatTreeNodes: FlatTreeNode[] = [];
@@ -766,7 +625,8 @@ export class CampaignWikiComponent implements OnInit {
   legacyMessage = '';
   templateCreatorVisible = false;
   creatingFromTemplate = false;
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
+  draggingNodeId: string | null = null;
+  movingHierarchy = false;
 
   searchTerm = '';
   selectedCategory = '';
@@ -782,16 +642,8 @@ export class CampaignWikiComponent implements OnInit {
     'SESSION_RECAP',
   ];
 
-  flashMessage = '';
-  flashType: 'success' | 'error' | 'info' = 'info';
-
   editorVisible = false;
   isEditing = false;
-<<<<<<< HEAD
-  internalLinkTarget = '';
-
-  form: WikiEditorForm = {
-=======
   form: {
     parentPageId: string;
     title: string;
@@ -801,13 +653,11 @@ export class CampaignWikiComponent implements OnInit {
     isPublic: boolean;
   } = {
     parentPageId: '',
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
     title: '',
     content: '',
     category: 'LORE',
     tagsInput: '',
     isPublic: true,
-    parentPageId: '',
   };
 
   templateForm: {
@@ -823,22 +673,12 @@ export class CampaignWikiComponent implements OnInit {
   };
 
   constructor(
-    private readonly route: ActivatedRoute,
-    private readonly wikiService: WikiService
+    private route: ActivatedRoute,
+    private wikiService: WikiService
   ) {}
-
-  get availableParents(): WikiPage[] {
-    return this.pages.filter((page) => page.id !== this.selectedPage?.id);
-  }
 
   ngOnInit(): void {
     this.campaignId = this.route.snapshot.paramMap.get('id') || '';
-<<<<<<< HEAD
-    this.loadData(false);
-  }
-
-  loadData(preserveSelection = true): void {
-=======
     this.loadTemplates();
     this.loadPages();
   }
@@ -852,33 +692,12 @@ export class CampaignWikiComponent implements OnInit {
   }
 
   loadPages(): void {
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
     if (!this.campaignId) {
       return;
     }
 
     this.loading = true;
     forkJoin({
-<<<<<<< HEAD
-      pagesResponse: this.wikiService.getCampaignPages(this.campaignId, {
-        category: (this.selectedCategory as WikiCategory) || undefined,
-        search: this.searchTerm || undefined,
-      }),
-      treeResponse: this.wikiService.getCampaignTree(this.campaignId),
-    }).subscribe({
-      next: ({ pagesResponse, treeResponse }) => {
-        this.pages = pagesResponse.data || [];
-        this.treeRows = this.flattenTree(treeResponse.data || []);
-        this.loading = false;
-
-        if (preserveSelection && this.selectedPageId && this.pages.some((page) => page.id === this.selectedPageId)) {
-          this.openPageById(this.selectedPageId, false);
-        }
-      },
-      error: () => {
-        this.loading = false;
-        this.setFlash('Falha ao carregar a wiki da campanha.', 'error');
-=======
       pages: this.wikiService.getCampaignPages(this.campaignId, {
         category: (this.selectedCategory as WikiCategory) || undefined,
         search: this.searchTerm || undefined,
@@ -895,37 +714,10 @@ export class CampaignWikiComponent implements OnInit {
       },
       error: () => {
         this.loading = false;
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
       },
     });
   }
 
-<<<<<<< HEAD
-  openPageById(pageId: string, forceEditor = true): void {
-    this.selectedPageId = pageId;
-
-    this.wikiService.getPageById(pageId).subscribe({
-      next: (response) => {
-        const page = response.data;
-        this.selectedPage = page;
-        this.linkedPages = page.linkedPages || [];
-        this.backlinks = page.backlinks || [];
-
-        this.form = {
-          title: page.title,
-          content: page.content,
-          category: page.category,
-          tagsInput: page.tags.join(', '),
-          isPublic: page.isPublic,
-          parentPageId: page.parentPageId || '',
-        };
-
-        this.isEditing = true;
-        this.editorVisible = forceEditor || this.editorVisible;
-      },
-      error: () => {
-        this.setFlash('Nao foi possivel abrir a pagina selecionada.', 'error');
-=======
   openPage(page: WikiPageView): void {
     this.selectedPage = page;
     this.editorVisible = true;
@@ -956,25 +748,17 @@ export class CampaignWikiComponent implements OnInit {
         const page = response.data as WikiPageView;
         this.pages = [page, ...this.pages.filter((entry) => entry.id !== page.id)];
         this.openPage(page);
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
       },
     });
   }
 
-  startCreate(parentPageId: string | null = null): void {
+  startCreate(): void {
     this.selectedPage = null;
-<<<<<<< HEAD
-    this.selectedPageId = null;
-    this.linkedPages = [];
-    this.backlinks = [];
-=======
     this.relations = null;
     this.blocks = [];
     this.blockEditorMode = false;
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
     this.editorVisible = true;
     this.isEditing = false;
-
     this.form = {
       parentPageId: '',
       title: '',
@@ -982,42 +766,15 @@ export class CampaignWikiComponent implements OnInit {
       category: 'LORE',
       tagsInput: '',
       isPublic: true,
-      parentPageId: parentPageId || '',
     };
   }
 
   cancelEdit(): void {
     this.editorVisible = false;
-<<<<<<< HEAD
-  }
-
-  seedLegacy(): void {
-    if (!this.campaignId) {
-      return;
-    }
-
-    this.seeding = true;
-    this.wikiService.seedLegacy(this.campaignId).subscribe({
-      next: (response) => {
-        const result = response.data;
-        this.seeding = false;
-        this.setFlash(
-          `Legado importado: ${result.created} criadas, ${result.skipped} reaproveitadas, total canonico ${result.total}.`,
-          'success'
-        );
-        this.loadData(false);
-      },
-      error: () => {
-        this.seeding = false;
-        this.setFlash('Falha ao importar o legado. Verifique se voce e GM da campanha.', 'error');
-      },
-    });
-=======
     this.selectedPage = null;
     this.relations = null;
     this.blocks = [];
     this.blockEditorMode = false;
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
   }
 
   savePage(): void {
@@ -1026,12 +783,8 @@ export class CampaignWikiComponent implements OnInit {
       .map((tag) => tag.trim())
       .filter((tag) => tag.length > 0);
 
-<<<<<<< HEAD
-    const basePayload = {
-=======
     const payload = {
       campaignId: this.campaignId,
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
       parentPageId: this.form.parentPageId || null,
       title: this.form.title,
       content: this.form.content,
@@ -1041,22 +794,11 @@ export class CampaignWikiComponent implements OnInit {
     };
 
     const request$ = this.isEditing && this.selectedPage
-      ? this.wikiService.updatePage(this.selectedPage.id, basePayload)
-      : this.wikiService.createPage({
-          campaignId: this.campaignId,
-          ...basePayload,
-        });
+      ? this.wikiService.updatePage(this.selectedPage.id, payload)
+      : this.wikiService.createPage(payload);
 
     request$.subscribe({
       next: () => {
-<<<<<<< HEAD
-        this.setFlash(this.isEditing ? 'Pagina atualizada com sucesso.' : 'Pagina criada com sucesso.', 'success');
-        this.editorVisible = false;
-        this.loadData(this.isEditing);
-      },
-      error: () => {
-        this.setFlash('Nao foi possivel salvar a pagina.', 'error');
-=======
         this.legacyMessage = '';
         this.editorVisible = false;
         this.selectedPage = null;
@@ -1064,7 +806,6 @@ export class CampaignWikiComponent implements OnInit {
         this.blocks = [];
         this.blockEditorMode = false;
         this.loadPages();
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
       },
     });
   }
@@ -1076,37 +817,16 @@ export class CampaignWikiComponent implements OnInit {
 
     this.wikiService.deletePage(this.selectedPage.id).subscribe({
       next: () => {
-        this.setFlash('Pagina removida com sucesso.', 'success');
         this.editorVisible = false;
         this.selectedPage = null;
-<<<<<<< HEAD
-        this.selectedPageId = null;
-        this.linkedPages = [];
-        this.backlinks = [];
-        this.loadData(false);
-      },
-      error: () => {
-        this.setFlash('Falha ao remover a pagina.', 'error');
-=======
         this.relations = null;
         this.blocks = [];
         this.blockEditorMode = false;
         this.loadPages();
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
       },
     });
   }
 
-<<<<<<< HEAD
-  insertInternalLink(): void {
-    if (!this.internalLinkTarget) {
-      return;
-    }
-
-    const separator = this.form.content.length > 0 && !this.form.content.endsWith(' ') ? ' ' : '';
-    this.form.content = `${this.form.content}${separator}@${this.internalLinkTarget}`;
-    this.internalLinkTarget = '';
-=======
   openTemplateCreator(): void {
     this.templateCreatorVisible = true;
     this.templateForm = {
@@ -1335,8 +1055,26 @@ export class CampaignWikiComponent implements OnInit {
     return this.flatTreeNodes.filter((node) => visibleIds.has(node.id));
   }
 
+  onTreeDragStart(nodeId: string): void {
+    this.draggingNodeId = nodeId;
+  }
+
+  onTreeDragOver(event: DragEvent): void {
+    event.preventDefault();
+  }
+
+  onTreeDropOnNode(targetNodeId: string, event: DragEvent): void {
+    event.preventDefault();
+    void this.moveTreeNode(targetNodeId);
+  }
+
+  onTreeDropOnRoot(event: DragEvent): void {
+    event.preventDefault();
+    void this.moveTreeNode(null);
+  }
+
   formatTreeOption(option: FlatTreeNode): string {
-    return `${'↳ '.repeat(option.depth)}${option.title}`;
+    return `${'Ôå│ '.repeat(option.depth)}${option.title}`;
   }
 
   getParentOptions(): FlatTreeNode[] {
@@ -1369,6 +1107,47 @@ export class CampaignWikiComponent implements OnInit {
     return descendants;
   }
 
+  private async moveTreeNode(nextParentId: string | null): Promise<void> {
+    const sourceNodeId = this.draggingNodeId;
+    this.draggingNodeId = null;
+
+    if (!sourceNodeId || this.movingHierarchy) {
+      return;
+    }
+
+    if (sourceNodeId === nextParentId) {
+      return;
+    }
+
+    if (nextParentId) {
+      const invalidParentIds = this.collectDescendantIds(sourceNodeId);
+      if (invalidParentIds.has(nextParentId)) {
+        this.legacyMessage = 'Movimento invalido: uma pagina nao pode virar filha de sua descendente.';
+        return;
+      }
+    }
+
+    this.movingHierarchy = true;
+    this.wikiService
+      .updatePage(sourceNodeId, {
+        parentPageId: nextParentId,
+      })
+      .subscribe({
+        next: () => {
+          this.legacyMessage = 'Hierarquia atualizada com sucesso.';
+          this.movingHierarchy = false;
+          this.loadPages();
+          if (this.selectedPage?.id) {
+            this.loadRelations(this.selectedPage.id);
+          }
+        },
+        error: () => {
+          this.legacyMessage = 'Falha ao mover pagina na arvore hierarquica.';
+          this.movingHierarchy = false;
+        },
+      });
+  }
+
   private findTreeNode(nodes: WikiTreeNode[], targetId: string): WikiTreeNode | null {
     for (const node of nodes) {
       if (node.id === targetId) {
@@ -1382,7 +1161,6 @@ export class CampaignWikiComponent implements OnInit {
     }
 
     return null;
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
   }
 
   renderMarkdown(markdown: string): string {
@@ -1397,35 +1175,10 @@ export class CampaignWikiComponent implements OnInit {
       .replace(/^# (.*)$/gm, '<h1>$1</h1>')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/@([^\n@#.,;:!?()[\]{}]{2,80})/g, '<span class="wiki-link-ref">@$1</span>')
       .replace(/^\- (.*)$/gm, '<li>$1</li>')
       .replace(/\n/g, '<br/>');
   }
 
-<<<<<<< HEAD
-  private flattenTree(nodes: WikiTreeNode[], depth = 0): TreeRow[] {
-    const rows: TreeRow[] = [];
-
-    for (const node of nodes) {
-      rows.push({
-        id: node.id,
-        title: node.title,
-        category: node.category,
-        isPublic: node.isPublic,
-        parentPageId: node.parentPageId,
-        depth,
-      });
-
-      rows.push(...this.flattenTree(node.children, depth + 1));
-    }
-
-    return rows;
-  }
-
-  private setFlash(message: string, type: 'success' | 'error' | 'info'): void {
-    this.flashMessage = message;
-    this.flashType = type;
-=======
   bootstrapLegacy(): void {
     if (!this.campaignId || this.bootstrappingLegacy) {
       return;
@@ -1437,16 +1190,15 @@ export class CampaignWikiComponent implements OnInit {
     this.wikiService.bootstrapLegacy(this.campaignId).subscribe({
       next: (response) => {
         const result = response.data;
-        this.legacyMessage = `Legado sincronizado: ${result.createdCount} página(s) criada(s), ${result.skippedCount} já existiam.`;
+        this.legacyMessage = `Legado sincronizado: ${result.createdCount} p├ígina(s) criada(s), ${result.skippedCount} j├í existiam.`;
         this.bootstrappingLegacy = false;
         this.loadPages();
       },
       error: () => {
-        this.legacyMessage = 'Não foi possível importar o legado. Verifique permissões de GM nesta campanha.';
+        this.legacyMessage = 'N├úo foi poss├¡vel importar o legado. Verifique permiss├Áes de GM nesta campanha.';
         this.bootstrappingLegacy = false;
       },
     });
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
   }
 }
 

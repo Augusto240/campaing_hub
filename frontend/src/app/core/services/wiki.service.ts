@@ -1,24 +1,19 @@
-import { Injectable } from '@angular/core';
+﻿import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   ApiResponse,
-<<<<<<< HEAD
-  LegacyWikiSeedResult,
-=======
   CreateWikiFromTemplateInput,
   UpsertWikiBlocksInput,
   WikiBlock,
   WikiFavorite,
   WikiMentionSuggestion,
   WikiPageRelations,
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
   WikiPage,
   WikiTemplate,
   WikiTreeNode,
   WikiCategory,
-  WikiTreeNode,
   CreateWikiPagePayload,
   UpdateWikiPagePayload,
 } from '../types';
@@ -66,16 +61,6 @@ export class WikiService {
     return this.http.get<ApiResponse<WikiPage>>(`${this.API_URL}/${wikiPageId}`);
   }
 
-<<<<<<< HEAD
-  getCampaignTree(campaignId: string): Observable<ApiResponse<WikiTreeNode[]>> {
-    return this.http.get<ApiResponse<WikiTreeNode[]>>(`${this.API_URL}/campaign/${campaignId}/tree`);
-  }
-
-  seedLegacy(campaignId: string): Observable<ApiResponse<LegacyWikiSeedResult>> {
-    return this.http.post<ApiResponse<LegacyWikiSeedResult>>(
-      `${this.API_URL}/campaign/${campaignId}/seed-legacy`,
-      {}
-=======
   getPageRelations(wikiPageId: string, limit = 8): Observable<ApiResponse<WikiPageRelations>> {
     const params = new HttpParams().set('limit', String(limit));
 
@@ -128,7 +113,6 @@ export class WikiService {
     return this.http.get<ApiResponse<WikiMentionSuggestion[]>>(
       `${this.API_URL}/campaign/${campaignId}/mentions`,
       { params }
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
     );
   }
 
