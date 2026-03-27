@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: campaign_pass
       POSTGRES_DB: campaign_hub
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -25,7 +25,7 @@ services:
     container_name: campaign-hub-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -48,11 +48,11 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://campaign_user:campaign_pass@postgres:5432/campaign_hub
       REDIS_URL: redis://redis:6379
-      CORS_ORIGIN: http://localhost
-      FRONTEND_URL: http://localhost
+      CORS_ORIGIN: http://localhost:8081
+      FRONTEND_URL: http://localhost:8081
       PORT: 3000
     ports:
-      - "3000:3000"
+      - "3002:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,7 +70,7 @@ services:
     container_name: campaign-hub-frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8081:80"
     depends_on:
       - backend
     networks:
@@ -83,7 +83,7 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
-      - "9090:9090"
+      - "9091:9090"
     depends_on:
       - backend
     networks:
@@ -94,7 +94,7 @@ services:
     container_name: campaign-hub-grafana
     restart: unless-stopped
     ports:
-      - "3001:3000"
+      - "3003:3000"
     environment:
       GF_SECURITY_ADMIN_PASSWORD: rpgmaster
     depends_on:
