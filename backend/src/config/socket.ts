@@ -320,7 +320,6 @@ export function setupSocket(httpServer: HttpServer): SocketServer {
       }
     });
 
-<<<<<<< HEAD
     typedSocket.on('campaign:tabletop:request', (campaignId: string) => {
       if (!typedSocket.data.joinedCampaignIds.has(campaignId)) {
         return;
@@ -358,7 +357,8 @@ export function setupSocket(httpServer: HttpServer): SocketServer {
 
       tabletopStateByCampaign.set(campaignId, nextState);
       emitTabletopState(io, campaignId);
-=======
+    });
+
     typedSocket.on('vtt:token:upsert', (payload: unknown) => {
       const parsed = parseTokenUpsertEvent(payload);
 
@@ -389,7 +389,6 @@ export function setupSocket(httpServer: HttpServer): SocketServer {
       };
 
       io.to(`campaign:${parsed.campaignId}`).emit('vtt:chat:message', outgoing);
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
     });
 
     typedSocket.on('disconnect', () => {

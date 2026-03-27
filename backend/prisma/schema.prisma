@@ -368,10 +368,7 @@ model WikiPage {
   id         String       @id @default(uuid())
   campaignId String       @map("campaign_id")
   parentPageId String?    @map("parent_page_id")
-<<<<<<< HEAD
   legacySource String?    @map("legacy_source")
-=======
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
   title      String
   content    String
   category   WikiCategory
@@ -385,17 +382,12 @@ model WikiPage {
   parent   WikiPage? @relation("WikiPageHierarchy", fields: [parentPageId], references: [id], onDelete: SetNull)
   children WikiPage[] @relation("WikiPageHierarchy")
   author   User     @relation("WikiPageAuthor", fields: [createdBy], references: [id], onDelete: Cascade)
-  parent   WikiPage? @relation("WikiPageHierarchy", fields: [parentPageId], references: [id], onDelete: SetNull)
-  children WikiPage[] @relation("WikiPageHierarchy")
   blocks   WikiBlock[]
   favorites WikiFavorite[]
 
   @@index([campaignId, category])
   @@index([campaignId, parentPageId])
-<<<<<<< HEAD
   @@index([campaignId, legacySource])
-=======
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
   @@map("wiki_pages")
 }
 

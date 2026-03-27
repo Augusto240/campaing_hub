@@ -9,11 +9,14 @@ export async function cleanDatabase(): Promise<void> {
   // Limpar na ordem correta (sem violar FK)
   await prisma.sessionVote.deleteMany();
   await prisma.sessionProposal.deleteMany();
+  await prisma.wikiFavorite.deleteMany();
+  await prisma.wikiBlock.deleteMany();
   await prisma.combatant.deleteMany();
   await prisma.combatEncounter.deleteMany();
   await prisma.diceRoll.deleteMany();
   await prisma.sanityEvent.deleteMany();
   await prisma.spellCast.deleteMany();
+  await prisma.creature.deleteMany();
   await prisma.wikiPage.deleteMany();
   await prisma.loot.deleteMany();
   await prisma.session.deleteMany();

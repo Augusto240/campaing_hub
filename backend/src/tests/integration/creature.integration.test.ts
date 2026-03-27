@@ -1,12 +1,34 @@
 import {
   cleanDatabase,
+  createTestUser,
   disconnectDatabase,
   prisma,
 } from './setup';
 
 describe('Creature Compendium Integration', () => {
+  let creatorId: string;
+
+  const ensureSystem = async (slug: string, name: string): Promise<string> => {
+    const system = await prisma.rpgSystem.upsert({
+      where: { slug },
+      update: {},
+      create: {
+        slug,
+        name,
+        description: `${name} test system`,
+        diceFormula: '1d20+mod',
+        attributeSchema: { attributes: ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] },
+      },
+      select: { id: true },
+    });
+
+    return system.id;
+  };
+
   beforeEach(async () => {
     await cleanDatabase();
+    const creator = await createTestUser(`creator-${Date.now()}@test.com`, 'Compendium Creator');
+    creatorId = creator.id;
   });
 
   afterAll(async () => {
@@ -16,12 +38,13 @@ describe('Creature Compendium Integration', () => {
 
   describe('Creature CRUD', () => {
     it('should create a creature with stats and abilities', async () => {
-      const system = await prisma.rpgSystem.findFirst({ where: { slug: 'dnd5e' } });
+      const systemId = await ensureSystem('dnd5e', 'Dungeons & Dragons 5e');
 
       const creature = await prisma.creature.create({
         data: {
           name: 'Goblin',
-          systemId: system?.id,
+          systemId,
+          createdBy: creatorId,
           creatureType: 'humanoid',
           stats: {
             hp: 7,
@@ -48,23 +71,47 @@ describe('Creature Compendium Integration', () => {
     });
 
     it('should filter creatures by systemId', async () => {
-      const dnd = await prisma.rpgSystem.findFirst({ where: { slug: 'dnd5e' } });
-      const coc = await prisma.rpgSystem.findFirst({ where: { slug: 'coc7e' } });
+      const dndId = await ensureSystem('dnd5e', 'Dungeons & Dragons 5e');
+      const cocId = await ensureSystem('coc7e', 'Call of Cthulhu 7e');
 
       await prisma.creature.createMany({
         data: [
-          { name: 'Orc', systemId: dnd?.id, creatureType: 'humanoid', xpReward: 100 },
-          { name: 'Dragon', systemId: dnd?.id, creatureType: 'dragon', xpReward: 5000 },
-          { name: 'Deep One', systemId: coc?.id, creatureType: 'mythos', xpReward: 0 },
+          {
+            name: 'Orc',
+            systemId: dndId,
+            createdBy: creatorId,
+            creatureType: 'humanoid',
+            stats: { hp: 15 },
+            abilities: [{ name: 'Axe Swing', description: 'Melee attack' }],
+            xpReward: 100,
+          },
+          {
+            name: 'Dragon',
+            systemId: dndId,
+            createdBy: creatorId,
+            creatureType: 'dragon',
+            stats: { hp: 200 },
+            abilities: [{ name: 'Fire Breath', description: 'Cone of fire' }],
+            xpReward: 5000,
+          },
+          {
+            name: 'Deep One',
+            systemId: cocId,
+            createdBy: creatorId,
+            creatureType: 'mythos',
+            stats: { hp: 12 },
+            abilities: [{ name: 'Claw', description: 'Savage strike' }],
+            xpReward: 0,
+          },
         ],
       });
 
       const dndCreatures = await prisma.creature.findMany({
-        where: { systemId: dnd?.id },
+        where: { systemId: dndId },
       });
 
       const cocCreatures = await prisma.creature.findMany({
-        where: { systemId: coc?.id },
+        where: { systemId: cocId },
       });
 
       expect(dndCreatures.length).toBe(2);
@@ -73,13 +120,37 @@ describe('Creature Compendium Integration', () => {
     });
 
     it('should filter creatures by creatureType', async () => {
-      const system = await prisma.rpgSystem.findFirst({ where: { slug: 'dnd5e' } });
+      const systemId = await ensureSystem('dnd5e', 'Dungeons & Dragons 5e');
 
       await prisma.creature.createMany({
         data: [
-          { name: 'Red Dragon', systemId: system?.id, creatureType: 'dragon', xpReward: 10000 },
-          { name: 'Blue Dragon', systemId: system?.id, creatureType: 'dragon', xpReward: 8000 },
-          { name: 'Zombie', systemId: system?.id, creatureType: 'undead', xpReward: 50 },
+          {
+            name: 'Red Dragon',
+            systemId,
+            createdBy: creatorId,
+            creatureType: 'dragon',
+            stats: { hp: 250 },
+            abilities: [{ name: 'Inferno', description: 'Massive fire blast' }],
+            xpReward: 10000,
+          },
+          {
+            name: 'Blue Dragon',
+            systemId,
+            createdBy: creatorId,
+            creatureType: 'dragon',
+            stats: { hp: 210 },
+            abilities: [{ name: 'Lightning Breath', description: 'Lightning line' }],
+            xpReward: 8000,
+          },
+          {
+            name: 'Zombie',
+            systemId,
+            createdBy: creatorId,
+            creatureType: 'undead',
+            stats: { hp: 22 },
+            abilities: [{ name: 'Undead Fortitude', description: 'Chance to resist death' }],
+            xpReward: 50,
+          },
         ],
       });
 
@@ -96,13 +167,37 @@ describe('Creature Compendium Integration', () => {
     });
 
     it('should search creatures by name (case insensitive)', async () => {
-      const system = await prisma.rpgSystem.findFirst({ where: { slug: 'dnd5e' } });
+      const systemId = await ensureSystem('dnd5e', 'Dungeons & Dragons 5e');
 
       await prisma.creature.createMany({
         data: [
-          { name: 'Goblin Boss', systemId: system?.id, creatureType: 'humanoid', xpReward: 200 },
-          { name: 'Hobgoblin', systemId: system?.id, creatureType: 'humanoid', xpReward: 100 },
-          { name: 'Orc', systemId: system?.id, creatureType: 'humanoid', xpReward: 100 },
+          {
+            name: 'Goblin Boss',
+            systemId,
+            createdBy: creatorId,
+            creatureType: 'humanoid',
+            stats: { hp: 21 },
+            abilities: [{ name: 'Command', description: 'Boosts nearby allies' }],
+            xpReward: 200,
+          },
+          {
+            name: 'Hobgoblin',
+            systemId,
+            createdBy: creatorId,
+            creatureType: 'humanoid',
+            stats: { hp: 11 },
+            abilities: [{ name: 'Martial Advantage', description: 'Extra tactical damage' }],
+            xpReward: 100,
+          },
+          {
+            name: 'Orc',
+            systemId,
+            createdBy: creatorId,
+            creatureType: 'humanoid',
+            stats: { hp: 15 },
+            abilities: [{ name: 'Aggressive', description: 'Advance quickly toward target' }],
+            xpReward: 100,
+          },
         ],
       });
 
@@ -118,14 +213,16 @@ describe('Creature Compendium Integration', () => {
     });
 
     it('should update creature stats', async () => {
-      const system = await prisma.rpgSystem.findFirst({ where: { slug: 'dnd5e' } });
+      const systemId = await ensureSystem('dnd5e', 'Dungeons & Dragons 5e');
 
       const creature = await prisma.creature.create({
         data: {
           name: 'Test Creature',
-          systemId: system?.id,
+          systemId,
+          createdBy: creatorId,
           creatureType: 'beast',
           stats: { hp: 10, ac: 12 },
+          abilities: [],
           xpReward: 25,
         },
       });
@@ -144,13 +241,16 @@ describe('Creature Compendium Integration', () => {
     });
 
     it('should delete a creature', async () => {
-      const system = await prisma.rpgSystem.findFirst({ where: { slug: 'dnd5e' } });
+      const systemId = await ensureSystem('dnd5e', 'Dungeons & Dragons 5e');
 
       const creature = await prisma.creature.create({
         data: {
           name: 'To Delete',
-          systemId: system?.id,
+          systemId,
+          createdBy: creatorId,
           creatureType: 'beast',
+          stats: { hp: 1 },
+          abilities: [],
           xpReward: 0,
         },
       });
@@ -164,12 +264,13 @@ describe('Creature Compendium Integration', () => {
 
   describe('Creature for different RPG systems', () => {
     it('should support Call of Cthulhu creature with sanity loss', async () => {
-      const coc = await prisma.rpgSystem.findFirst({ where: { slug: 'coc7e' } });
+      const cocId = await ensureSystem('coc7e', 'Call of Cthulhu 7e');
 
       const creature = await prisma.creature.create({
         data: {
           name: 'Shoggoth',
-          systemId: coc?.id,
+          systemId: cocId,
+          createdBy: creatorId,
           creatureType: 'mythos',
           description: 'A massive amorphous creature',
           stats: {
@@ -192,12 +293,13 @@ describe('Creature Compendium Integration', () => {
     });
 
     it('should support Tormenta20 creature with mana', async () => {
-      const t20 = await prisma.rpgSystem.findFirst({ where: { slug: 'tormenta20' } });
+      const t20Id = await ensureSystem('tormenta20', 'Tormenta20');
 
       const creature = await prisma.creature.create({
         data: {
           name: 'Lefou Mago',
-          systemId: t20?.id,
+          systemId: t20Id,
+          createdBy: creatorId,
           creatureType: 'aberração',
           stats: {
             hp: 25,

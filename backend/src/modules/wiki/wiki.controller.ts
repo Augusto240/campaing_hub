@@ -48,22 +48,16 @@ export const getCampaignWikiTree = asyncHandler(
   async (req: AuthRequest, res: Response, _next: NextFunction) => {
     const { campaignId } = validate(campaignIdParamsSchema, req.params);
 
-<<<<<<< HEAD
     const tree = await wikiService.getPageTree({
       campaignId,
       userId: req.user!.id,
     });
-=======
-    const tree = await wikiService.getTree(campaignId, req.user!.id);
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
 
     res.json(success(tree, 'Wiki tree retrieved successfully'));
   }
 );
 
 /**
-<<<<<<< HEAD
-=======
  * GET /api/wiki/templates
  * Lista templates de wiki no estilo Notion.
  */
@@ -103,7 +97,6 @@ export const createWikiFromTemplate = asyncHandler(
 );
 
 /**
->>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
  * GET /api/wiki/:wikiPageId
  * Retorna uma pagina wiki.
  */
@@ -237,7 +230,6 @@ export const createWikiPage = asyncHandler(
       campaignId,
       parentPageId,
       userId: req.user!.id,
-      parentPageId,
       title,
       content,
       category,
