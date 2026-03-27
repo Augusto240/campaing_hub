@@ -27,7 +27,14 @@ import { WikiCategory, WikiService } from '../../../core/services/wiki.service';
           <option *ngFor="let c of categories" [value]="c">{{ c }}</option>
         </select>
         <button class="btn btn-outline" (click)="loadPages()">Filtrar</button>
+        <button class="btn btn-outline" (click)="bootstrapLegacy()" [disabled]="bootstrappingLegacy">
+          {{ bootstrappingLegacy ? 'Importando legado...' : 'Importar Legado 2023' }}
+        </button>
         <button class="btn btn-primary" (click)="startCreate()">+ Nova Página</button>
+      </div>
+
+      <div class="legacy-feedback" *ngIf="legacyMessage">
+        {{ legacyMessage }}
       </div>
 
       <div class="wiki-grid" *ngIf="!loading">
@@ -122,6 +129,15 @@ import { WikiCategory, WikiService } from '../../../core/services/wiki.service';
         display: grid;
         grid-template-columns: 300px 1fr;
         gap: 1rem;
+      }
+      .legacy-feedback {
+        margin-bottom: 1rem;
+        color: var(--accent-primary);
+        border: 1px solid rgba(201, 168, 76, 0.4);
+        background: rgba(201, 168, 76, 0.08);
+        border-radius: var(--radius-sm);
+        padding: 0.6rem 0.8rem;
+        font-size: 0.85rem;
       }
       .card {
         background: var(--bg-card);
@@ -232,6 +248,8 @@ export class CampaignWikiComponent implements OnInit {
   loading = true;
   pages: any[] = [];
   selectedPage: any | null = null;
+  bootstrappingLegacy = false;
+  legacyMessage = '';
 
   searchTerm = '';
   selectedCategory = '';
@@ -347,6 +365,7 @@ export class CampaignWikiComponent implements OnInit {
 
     request$.subscribe({
       next: () => {
+        this.legacyMessage = '';
         this.editorVisible = false;
         this.loadPages();
       },
@@ -381,6 +400,28 @@ export class CampaignWikiComponent implements OnInit {
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/^\- (.*)$/gm, '<li>$1</li>')
       .replace(/\n/g, '<br/>');
+  }
+
+  bootstrapLegacy(): void {
+    if (!this.campaignId || this.bootstrappingLegacy) {
+      return;
+    }
+
+    this.bootstrappingLegacy = true;
+    this.legacyMessage = '';
+
+    this.wikiService.bootstrapLegacy(this.campaignId).subscribe({
+      next: (response) => {
+        const result = response.data;
+        this.legacyMessage = `Legado sincronizado: ${result.createdCount} página(s) criada(s), ${result.skippedCount} já existiam.`;
+        this.bootstrappingLegacy = false;
+        this.loadPages();
+      },
+      error: () => {
+        this.legacyMessage = 'Não foi possível importar o legado. Verifique permissões de GM nesta campanha.';
+        this.bootstrappingLegacy = false;
+      },
+    });
   }
 }
 

@@ -60,4 +60,20 @@ export class WikiService {
   deletePage(wikiPageId: string): Observable<ApiResponse<null>> {
     return this.http.delete<ApiResponse<null>>(`${this.API_URL}/${wikiPageId}`);
   }
+
+  bootstrapLegacy(campaignId: string): Observable<
+    ApiResponse<{
+      createdCount: number;
+      skippedCount: number;
+      createdPages: Array<{ id: string; title: string; category: WikiCategory }>;
+    }>
+  > {
+    return this.http.post<
+      ApiResponse<{
+        createdCount: number;
+        skippedCount: number;
+        createdPages: Array<{ id: string; title: string; category: WikiCategory }>;
+      }>
+    >(`${this.API_URL}/campaign/${campaignId}/bootstrap-legacy`, {});
+  }
 }

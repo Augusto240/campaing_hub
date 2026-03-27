@@ -111,3 +111,20 @@ export const deleteWikiPage = asyncHandler(
     res.json(success(null, 'Wiki page deleted successfully'));
   }
 );
+
+/**
+ * POST /api/wiki/campaign/:campaignId/bootstrap-legacy
+ * Importa paginas canonicas do legado 2023 para a campanha.
+ */
+export const bootstrapLegacyWiki = asyncHandler(
+  async (req: AuthRequest, res: Response, _next: NextFunction) => {
+    const { campaignId } = validate(campaignIdParamsSchema, req.params);
+
+    const result = await wikiService.bootstrapLegacyCanon({
+      campaignId,
+      userId: req.user!.id,
+    });
+
+    res.status(201).json(success(result, 'Legacy canon pages imported successfully'));
+  }
+);

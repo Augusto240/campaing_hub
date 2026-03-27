@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth.middleware';
-import { isCampaignMember } from '../../middlewares/permission.middleware';
+import { canManageCampaign, isCampaignMember } from '../../middlewares/permission.middleware';
 import {
+  bootstrapLegacyWiki,
   createWikiPage,
   deleteWikiPage,
   getCampaignWikiPages,
@@ -13,6 +14,7 @@ const router = Router();
 
 router.use(authenticate);
 
+router.post('/campaign/:campaignId/bootstrap-legacy', canManageCampaign, bootstrapLegacyWiki);
 router.get('/campaign/:campaignId', isCampaignMember, getCampaignWikiPages);
 router.get('/:wikiPageId', isCampaignMember, getWikiPageById);
 router.post('/', isCampaignMember, createWikiPage);
