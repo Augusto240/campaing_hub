@@ -4,8 +4,19 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   ApiResponse,
+<<<<<<< HEAD
   LegacyWikiSeedResult,
+=======
+  CreateWikiFromTemplateInput,
+  UpsertWikiBlocksInput,
+  WikiBlock,
+  WikiFavorite,
+  WikiMentionSuggestion,
+  WikiPageRelations,
+>>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
   WikiPage,
+  WikiTemplate,
+  WikiTreeNode,
   WikiCategory,
   WikiTreeNode,
   CreateWikiPagePayload,
@@ -47,10 +58,15 @@ export class WikiService {
     });
   }
 
+  getCampaignTree(campaignId: string): Observable<ApiResponse<WikiTreeNode[]>> {
+    return this.http.get<ApiResponse<WikiTreeNode[]>>(`${this.API_URL}/campaign/${campaignId}/tree`);
+  }
+
   getPageById(wikiPageId: string): Observable<ApiResponse<WikiPage>> {
     return this.http.get<ApiResponse<WikiPage>>(`${this.API_URL}/${wikiPageId}`);
   }
 
+<<<<<<< HEAD
   getCampaignTree(campaignId: string): Observable<ApiResponse<WikiTreeNode[]>> {
     return this.http.get<ApiResponse<WikiTreeNode[]>>(`${this.API_URL}/campaign/${campaignId}/tree`);
   }
@@ -59,6 +75,60 @@ export class WikiService {
     return this.http.post<ApiResponse<LegacyWikiSeedResult>>(
       `${this.API_URL}/campaign/${campaignId}/seed-legacy`,
       {}
+=======
+  getPageRelations(wikiPageId: string, limit = 8): Observable<ApiResponse<WikiPageRelations>> {
+    const params = new HttpParams().set('limit', String(limit));
+
+    return this.http.get<ApiResponse<WikiPageRelations>>(`${this.API_URL}/${wikiPageId}/relations`, {
+      params,
+    });
+  }
+
+  getTemplates(): Observable<ApiResponse<WikiTemplate[]>> {
+    return this.http.get<ApiResponse<WikiTemplate[]>>(`${this.API_URL}/templates`);
+  }
+
+  createPageFromTemplate(
+    campaignId: string,
+    payload: CreateWikiFromTemplateInput
+  ): Observable<ApiResponse<WikiPage>> {
+    return this.http.post<ApiResponse<WikiPage>>(`${this.API_URL}/campaign/${campaignId}/from-template`, payload);
+  }
+
+  getPageBlocks(wikiPageId: string): Observable<ApiResponse<WikiBlock[]>> {
+    return this.http.get<ApiResponse<WikiBlock[]>>(`${this.API_URL}/${wikiPageId}/blocks`);
+  }
+
+  upsertPageBlocks(
+    wikiPageId: string,
+    payload: UpsertWikiBlocksInput
+  ): Observable<ApiResponse<WikiBlock[]>> {
+    return this.http.put<ApiResponse<WikiBlock[]>>(`${this.API_URL}/${wikiPageId}/blocks`, payload);
+  }
+
+  addFavorite(wikiPageId: string): Observable<ApiResponse<null>> {
+    return this.http.post<ApiResponse<null>>(`${this.API_URL}/${wikiPageId}/favorite`, {});
+  }
+
+  removeFavorite(wikiPageId: string): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.API_URL}/${wikiPageId}/favorite`);
+  }
+
+  getFavorites(campaignId: string): Observable<ApiResponse<WikiFavorite[]>> {
+    return this.http.get<ApiResponse<WikiFavorite[]>>(`${this.API_URL}/campaign/${campaignId}/favorites`);
+  }
+
+  searchMentions(
+    campaignId: string,
+    query: string,
+    limit = 8
+  ): Observable<ApiResponse<WikiMentionSuggestion[]>> {
+    const params = new HttpParams().set('query', query).set('limit', String(limit));
+
+    return this.http.get<ApiResponse<WikiMentionSuggestion[]>>(
+      `${this.API_URL}/campaign/${campaignId}/mentions`,
+      { params }
+>>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
     );
   }
 
@@ -72,5 +142,21 @@ export class WikiService {
 
   deletePage(wikiPageId: string): Observable<ApiResponse<null>> {
     return this.http.delete<ApiResponse<null>>(`${this.API_URL}/${wikiPageId}`);
+  }
+
+  bootstrapLegacy(campaignId: string): Observable<
+    ApiResponse<{
+      createdCount: number;
+      skippedCount: number;
+      createdPages: Array<{ id: string; title: string; category: WikiCategory }>;
+    }>
+  > {
+    return this.http.post<
+      ApiResponse<{
+        createdCount: number;
+        skippedCount: number;
+        createdPages: Array<{ id: string; title: string; category: WikiCategory }>;
+      }>
+    >(`${this.API_URL}/campaign/${campaignId}/bootstrap-legacy`, {});
   }
 }

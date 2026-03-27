@@ -204,7 +204,7 @@ export class CampaignListComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadSystems();
-    this.loadCampaigns();
+    this.loadCampaigns(true);
   }
 
   loadSystems(): void {
@@ -239,8 +239,8 @@ export class CampaignListComponent implements OnInit {
     });
   }
 
-  loadCampaigns(): void {
-    this.campaignService.getCampaigns().subscribe({
+  loadCampaigns(bustCache = false): void {
+    this.campaignService.getCampaigns({ bustCache }).subscribe({
       next: (response) => {
         this.campaigns = (response.data || []) as CampaignCard[];
         this.loading = false;
@@ -278,21 +278,39 @@ export class CampaignListComponent implements OnInit {
       this.campaignService.updateCampaign(this.editingId, this.formData).subscribe({
         next: () => {
           this.showModal = false;
-          this.loadCampaigns();
+          this.loadCampaigns(true);
         },
       });
       return;
     }
 
     this.campaignService.createCampaign(this.formData).subscribe({
-      next: () => {
+      next: (response) => {
+        const created = response.data as Partial<CampaignCard> & { id: string; name: string; system: string };
+
+        if (created?.id) {
+          const optimistic: CampaignCard = {
+            id: created.id,
+            name: created.name,
+            description: created.description,
+            system: created.system,
+            owner: created.owner || { name: 'Voce' },
+            _count: {
+              characters: 0,
+              sessions: 0,
+            },
+          };
+
+          this.campaigns = [optimistic, ...this.campaigns.filter((campaign) => campaign.id !== created.id)];
+        }
+
         this.showModal = false;
         this.formData = {
           name: '',
           system: this.systems[0]?.slug || 'dnd5e',
           description: '',
         };
-        this.loadCampaigns();
+        this.loadCampaigns(true);
       },
     });
   }
@@ -311,7 +329,7 @@ export class CampaignListComponent implements OnInit {
       next: () => {
         this.showDeleteConfirm = false;
         this.deletingCampaign = null;
-        this.loadCampaigns();
+        this.loadCampaigns(true);
       },
     });
   }

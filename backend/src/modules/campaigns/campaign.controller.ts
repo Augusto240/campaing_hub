@@ -34,6 +34,10 @@ export const getCampaigns = asyncHandler(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     const campaigns = await campaignService.getUserCampaigns(req.user!.id);
 
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     res.json(success(campaigns, 'Campaigns retrieved successfully'));
   }
 );

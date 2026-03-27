@@ -17,6 +17,7 @@ export type EventType = 'BATTLE' | 'STORY' | 'NPC' | 'TREASURE';
 export type Rarity = 'MUNDANE' | 'COMMON' | 'UNCOMMON' | 'RARE' | 'VERY_RARE' | 'LEGENDARY' | 'ARTIFACT' | 'ELDRITCH';
 export type ItemType = 'WEAPON' | 'ARMOR' | 'POTION' | 'SCROLL' | 'WAND' | 'RING' | 'MISC' | 'MAGIC_ITEM' | 'CONSUMABLE' | 'TOME' | 'MYTHOS_TOME' | 'RELIC';
 export type WikiCategory = 'NPC' | 'LOCATION' | 'FACTION' | 'LORE' | 'HOUSE_RULE' | 'BESTIARY' | 'DEITY' | 'MYTHOS' | 'SESSION_RECAP';
+export type WikiBlockType = 'TEXT' | 'CHECKLIST' | 'QUOTE' | 'CALLOUT' | 'CODE' | 'IMAGE' | 'TABLE';
 export type RpgSystemSlug = 'DND5E' | 'T20' | 'COC' | 'PATHFINDER';
 
 // ============================================================================
@@ -200,7 +201,10 @@ export interface WikiPage {
   id: string;
   campaignId: string;
   parentPageId: string | null;
+<<<<<<< HEAD
   legacySource: string | null;
+=======
+>>>>>>> bd47dd9da94ef8cb6fed9c2db135d6dcdeef18bd
   title: string;
   content: string;
   category: WikiCategory;
@@ -236,6 +240,61 @@ export interface LegacyWikiSeedResult {
 
 export interface WikiPageWithAuthor extends WikiPage {
   author: Pick<User, 'id' | 'name'>;
+  parent?: Pick<WikiPage, 'id' | 'title' | 'category'> | null;
+  _count?: {
+    children: number;
+  };
+}
+
+export interface WikiTreeNode {
+  id: string;
+  title: string;
+  category: WikiCategory;
+  parentPageId: string | null;
+  isPublic: boolean;
+  updatedAt: string;
+  children: WikiTreeNode[];
+}
+
+export interface WikiPageRelations {
+  page: {
+    id: string;
+    title: string;
+    category: WikiCategory;
+    tags: string[];
+    parentPageId: string | null;
+  };
+  parent: {
+    id: string;
+    title: string;
+    category: WikiCategory;
+  } | null;
+  children: Array<{
+    id: string;
+    title: string;
+    category: WikiCategory;
+    updatedAt: string;
+  }>;
+  backlinks: Array<{
+    id: string;
+    title: string;
+    category: WikiCategory;
+    updatedAt: string;
+  }>;
+  outgoingLinks: Array<{
+    id: string;
+    title: string;
+    category: WikiCategory;
+    updatedAt: string;
+  }>;
+  relatedByTag: Array<{
+    id: string;
+    title: string;
+    category: WikiCategory;
+    updatedAt: string;
+    sharedTags: string[];
+    sharedTagsCount: number;
+  }>;
 }
 
 export interface DiceRoll {
@@ -308,6 +367,41 @@ export interface PaginatedResponse<T> {
     total: number;
     totalPages: number;
   };
+}
+
+export interface WikiBlock {
+  id: string;
+  blockType: WikiBlockType;
+  sortOrder: number;
+  payload: Record<string, unknown>;
+  updatedAt: string;
+}
+
+export interface WikiTemplate {
+  key: 'CHARACTER_DOSSIER' | 'LOCATION_ATLAS' | 'SESSION_CHRONICLE';
+  name: string;
+  description: string;
+  category: WikiCategory;
+  tags: string[];
+  blockTypes: WikiBlockType[];
+}
+
+export interface WikiFavorite {
+  id: string;
+  createdAt: string;
+  page: {
+    id: string;
+    title: string;
+    category: WikiCategory;
+    isPublic: boolean;
+    updatedAt: string;
+  };
+}
+
+export interface WikiMentionSuggestion {
+  id: string;
+  title: string;
+  category: WikiCategory;
 }
 
 // ============================================================================
@@ -464,6 +558,22 @@ export interface UpdateWikiPageInput {
   category?: WikiCategory;
   tags?: string[];
   isPublic?: boolean;
+}
+
+export interface CreateWikiFromTemplateInput {
+  title: string;
+  templateKey: 'CHARACTER_DOSSIER' | 'LOCATION_ATLAS' | 'SESSION_CHRONICLE';
+  parentPageId?: string | null;
+  category?: WikiCategory;
+  tags?: string[];
+  isPublic?: boolean;
+}
+
+export interface UpsertWikiBlocksInput {
+  blocks: Array<{
+    blockType: WikiBlockType;
+    payload: Record<string, unknown>;
+  }>;
 }
 
 export interface DiceRollInput {

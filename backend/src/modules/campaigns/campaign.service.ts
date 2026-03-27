@@ -16,9 +16,9 @@ const creatureService = new CreatureService();
 
 export class CampaignService {
   async createCampaign(ownerId: string, name: string, description: string | undefined, system: string) {
-    return prisma.$transaction(async (tx) => {
+    const campaign = await prisma.$transaction(async (tx) => {
       const systemTemplate = await rpgSystemService.resolveSystemFromInput(system, tx);
-      const campaign = await tx.campaign.create({
+      const createdCampaign = await tx.campaign.create({
         data: {
           name,
           description,
@@ -43,12 +43,20 @@ export class CampaignService {
           userId: ownerId,
           action: 'CREATE',
           entityType: 'CAMPAIGN',
-          entityId: campaign.id,
+          entityId: createdCampaign.id,
         },
       });
 
-      return campaign;
+      return createdCampaign;
     });
+
+    // Keep list/dashboard in sync right after creation.
+    await Promise.all([
+      deleteCacheValue(CacheKeys.userCampaigns(ownerId)),
+      deleteCacheValue(`dashboard:${ownerId}`),
+    ]);
+
+    return campaign;
   }
 
   async getUserCampaigns(userId: string) {

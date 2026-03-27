@@ -40,6 +40,11 @@ export class SocketService implements OnDestroy {
     this.socket?.emit('campaign:leave', campaignId);
   }
 
+  emit<TPayload>(event: string, payload: TPayload): void {
+    this.connect();
+    this.socket?.emit(event, payload);
+  }
+
   on<T>(event: string): Observable<T> {
     return new Observable<T>((observer) => {
       const listener = (payload: T) => observer.next(payload);

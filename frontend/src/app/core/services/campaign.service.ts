@@ -23,8 +23,14 @@ export class CampaignService {
 
   constructor(private http: HttpClient) {}
 
-  getCampaigns(): Observable<ApiResponse<CampaignWithRelations[]>> {
-    return this.http.get<ApiResponse<CampaignWithRelations[]>>(this.API_URL);
+  getCampaigns(options?: { bustCache?: boolean }): Observable<ApiResponse<CampaignWithRelations[]>> {
+    let params = new HttpParams();
+
+    if (options?.bustCache) {
+      params = params.set('_ts', String(Date.now()));
+    }
+
+    return this.http.get<ApiResponse<CampaignWithRelations[]>>(this.API_URL, { params });
   }
 
   getCampaignById(id: string): Observable<ApiResponse<CampaignWithRelations>> {
