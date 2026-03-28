@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { sanityChecksTotal } from '../../config/metrics';
 import { emitCampaignEvent } from '../../config/realtime';
 import { prisma } from '../../config/database';
+import { deleteCacheByPattern } from '../../config/redis';
 import { AppError } from '../../utils/error-handler';
 import { calculateLevelFromXP } from '../../utils/xp-calculator';
 
@@ -176,6 +177,47 @@ export class CharacterService {
         });
       }
 
+      await tx.node.upsert({
+        where: {
+          campaignId_entityType_sourceId: {
+            campaignId: input.campaignId,
+            entityType: 'CHARACTER',
+            sourceId: character.id,
+          },
+        },
+        update: {
+          type: 'CHARACTER',
+          title: character.name,
+          content: {
+            characterId: character.id,
+            class: character.class,
+            level: character.level,
+          },
+          label: character.name,
+          metadata: {
+            class: character.class,
+            level: character.level,
+          },
+        },
+        create: {
+          campaignId: input.campaignId,
+          type: 'CHARACTER',
+          title: character.name,
+          content: {
+            characterId: character.id,
+            class: character.class,
+            level: character.level,
+          },
+          entityType: 'CHARACTER',
+          sourceId: character.id,
+          label: character.name,
+          metadata: {
+            class: character.class,
+            level: character.level,
+          },
+        },
+      });
+
       return character;
     });
   }
@@ -245,20 +287,53 @@ export class CharacterService {
       normalizedData.level = calculateLevelFromXP(normalizedData.xp);
     }
 
-    return prisma.character.update({
-      where: { id: characterId },
-      data: normalizedData,
-      include: {
-        player: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+    const updatedCharacter = await prisma.$transaction(async (tx) => {
+      const character = await tx.character.update({
+        where: { id: characterId },
+        data: normalizedData,
+        include: {
+          player: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          systemTemplate: true,
+        },
+      });
+
+      await tx.node.updateMany({
+        where: {
+          campaignId: character.campaignId,
+          entityType: 'CHARACTER',
+          sourceId: character.id,
+        },
+        data: {
+          type: 'CHARACTER',
+          title: character.name,
+          content: {
+            characterId: character.id,
+            class: character.class,
+            level: character.level,
+          },
+          label: character.name,
+          metadata: {
+            class: character.class,
+            level: character.level,
           },
         },
-        systemTemplate: true,
-      },
+      });
+
+      return character;
     });
+
+    await Promise.all([
+      deleteCacheByPattern(`node:${updatedCharacter.campaignId}:*`),
+      deleteCacheByPattern(`core:${updatedCharacter.campaignId}:*`),
+    ]);
+
+    return updatedCharacter;
   }
 
   async updateResources(characterId: string, resourcesPatch: JsonObject) {
@@ -304,9 +379,62 @@ export class CharacterService {
   }
 
   async deleteCharacter(characterId: string) {
-    await prisma.character.delete({
-      where: { id: characterId },
+    const deleted = await prisma.$transaction(async (tx) => {
+      const character = await tx.character.findUnique({
+        where: { id: characterId },
+        select: {
+          id: true,
+          campaignId: true,
+        },
+      });
+
+      if (!character) {
+        throw new AppError(404, 'Character not found');
+      }
+
+      const characterNode = await tx.node.findFirst({
+        where: {
+          campaignId: character.campaignId,
+          entityType: 'CHARACTER',
+          sourceId: character.id,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (characterNode) {
+        await Promise.all([
+          tx.nodeRelation.deleteMany({
+            where: {
+              OR: [{ fromId: characterNode.id }, { toId: characterNode.id }],
+            },
+          }),
+          tx.coreRelation.deleteMany({
+            where: {
+              OR: [{ sourceNodeId: characterNode.id }, { targetNodeId: characterNode.id }],
+            },
+          }),
+        ]);
+
+        await tx.node.delete({
+          where: {
+            id: characterNode.id,
+          },
+        });
+      }
+
+      await tx.character.delete({
+        where: { id: characterId },
+      });
+
+      return character;
     });
+
+    await Promise.all([
+      deleteCacheByPattern(`node:${deleted.campaignId}:*`),
+      deleteCacheByPattern(`core:${deleted.campaignId}:*`),
+    ]);
   }
 
   async uploadSheet(characterId: string, filePath: string) {

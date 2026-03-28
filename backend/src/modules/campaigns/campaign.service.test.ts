@@ -5,6 +5,9 @@ const mockTx = {
   activityLog: {
     create: jest.fn(),
   },
+  node: {
+    upsert: jest.fn(),
+  },
 };
 
 const mockPrisma = {
@@ -63,6 +66,7 @@ describe('CampaignService', () => {
 
     mockTx.campaign.create.mockResolvedValue(createdCampaign);
     mockTx.activityLog.create.mockResolvedValue({ id: 'activity-1' });
+    mockTx.node.upsert.mockResolvedValue({ id: 'node-1' });
 
     const service = new CampaignService();
     const result = await service.createCampaign(

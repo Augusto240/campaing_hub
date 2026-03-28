@@ -20,6 +20,7 @@ import sessionProposalRoutes from './modules/session-proposals/proposal.routes';
 import compendiumRoutes from './modules/compendium/compendium.routes';
 import knowledgeGraphRoutes from './modules/knowledge-graph/knowledge-graph.routes';
 import coreRoutes from './modules/core/core.routes';
+import nodeRoutes from './modules/node/node.routes';
 import {
   canAccessMetrics,
   metricsMiddleware,
@@ -105,6 +106,7 @@ export const createApp = () => {
   app.use('/api/compendium', compendiumRoutes);
   app.use('/api/knowledge-graph', knowledgeGraphRoutes);
   app.use('/api/core', coreRoutes);
+  app.use('/api/nodes', nodeRoutes);
 
   app.use(errorMiddleware);
 

@@ -47,6 +47,49 @@ export class CampaignService {
         },
       });
 
+      await tx.node.upsert({
+        where: {
+          campaignId_entityType_sourceId: {
+            campaignId: createdCampaign.id,
+            entityType: 'LEGACY_ANCHOR',
+            sourceId: createdCampaign.id,
+          },
+        },
+        update: {
+          type: 'CAMPAIGN',
+          title: createdCampaign.name,
+          content: {
+            campaignId: createdCampaign.id,
+            name: createdCampaign.name,
+            description: createdCampaign.description,
+            system: createdCampaign.system,
+          },
+          label: createdCampaign.name,
+          metadata: {
+            description: createdCampaign.description,
+            system: createdCampaign.system,
+          },
+        },
+        create: {
+          campaignId: createdCampaign.id,
+          type: 'CAMPAIGN',
+          title: createdCampaign.name,
+          content: {
+            campaignId: createdCampaign.id,
+            name: createdCampaign.name,
+            description: createdCampaign.description,
+            system: createdCampaign.system,
+          },
+          entityType: 'LEGACY_ANCHOR',
+          sourceId: createdCampaign.id,
+          label: createdCampaign.name,
+          metadata: {
+            description: createdCampaign.description,
+            system: createdCampaign.system,
+          },
+        },
+      });
+
       return createdCampaign;
     });
 
@@ -54,6 +97,8 @@ export class CampaignService {
     await Promise.all([
       deleteCacheValue(CacheKeys.userCampaigns(ownerId)),
       deleteCacheValue(`dashboard:${ownerId}`),
+      deleteCacheByPattern(`node:${campaign.id}:*`),
+      deleteCacheByPattern(`core:${campaign.id}:*`),
     ]);
 
     return campaign;
@@ -210,11 +255,36 @@ export class CampaignService {
       },
     });
 
+    await prisma.node.updateMany({
+      where: {
+        campaignId,
+        entityType: 'LEGACY_ANCHOR',
+        sourceId: campaignId,
+      },
+      data: {
+        type: 'CAMPAIGN',
+        title: campaign.name,
+        content: {
+          campaignId: campaign.id,
+          name: campaign.name,
+          description: campaign.description,
+          system: campaign.system,
+        },
+        label: campaign.name,
+        metadata: {
+          description: campaign.description,
+          system: campaign.system,
+        },
+      },
+    });
+
     // Invalidate caches
     await Promise.all([
       deleteCacheValue(CacheKeys.campaign(campaignId)),
       deleteCacheValue(CacheKeys.campaignStats(campaignId)),
       deleteCacheByPattern('user:*:campaigns'),
+      deleteCacheByPattern(`node:${campaignId}:*`),
+      deleteCacheByPattern(`core:${campaignId}:*`),
     ]);
 
     return campaign;
@@ -231,6 +301,8 @@ export class CampaignService {
       deleteCacheValue(CacheKeys.campaignStats(campaignId)),
       deleteCacheByPattern('user:*:campaigns'),
       deleteCacheByPattern(`campaign:${campaignId}:*`),
+      deleteCacheByPattern(`node:${campaignId}:*`),
+      deleteCacheByPattern(`core:${campaignId}:*`),
     ]);
   }
 

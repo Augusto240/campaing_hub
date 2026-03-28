@@ -40,6 +40,15 @@ type StaticCompendiumKind = 'BESTIARY' | 'SPELL' | 'ITEM' | 'CLASS';
 
 const prismaUnsafe = prisma as unknown as Record<string, any>;
 
+const getNodeStore = (store: Record<string, any>): Record<string, any> => {
+  const delegate = store.node ?? store.coreNode;
+  if (!delegate) {
+    throw new AppError(500, 'Node storage delegate is unavailable');
+  }
+
+  return delegate as Record<string, any>;
+};
+
 const WIKI_LINK_PATTERN = /\[\[([^\]]+)\]\]/g;
 
 const normalize = (value: string): string => value.trim().toLowerCase();
@@ -377,7 +386,9 @@ export class CoreService {
         },
       });
 
-      const coreNode = await (tx as any).coreNode.upsert({
+      const nodeStore = getNodeStore(tx as unknown as Record<string, any>);
+
+      const coreNode = await nodeStore.upsert({
         where: {
           campaignId_entityType_sourceId: {
             campaignId: input.campaignId,
@@ -485,7 +496,7 @@ export class CoreService {
             },
           });
 
-          const parentNode = await (tx as any).coreNode.upsert({
+          const parentNode = await nodeStore.upsert({
             where: {
               campaignId_entityType_sourceId: {
                 campaignId: input.campaignId,
@@ -565,7 +576,7 @@ export class CoreService {
             continue;
           }
 
-          const linkedCoreNode = await (tx as any).coreNode.upsert({
+          const linkedCoreNode = await nodeStore.upsert({
             where: {
               campaignId_entityType_sourceId: {
                 campaignId: input.campaignId,
@@ -733,7 +744,7 @@ export class CoreService {
 
     await this.resolveCampaignContext(page.campaignId, input.userId);
 
-    const targetNode = await prismaUnsafe.coreNode.findUnique({
+    const targetNode = await getNodeStore(prismaUnsafe).findUnique({
       where: {
         campaignId_entityType_sourceId: {
           campaignId: page.campaignId,
@@ -964,7 +975,9 @@ export class CoreService {
         },
       });
 
-      const entryNode = await (tx as any).coreNode.upsert({
+      const nodeStore = getNodeStore(tx as unknown as Record<string, any>);
+
+      const entryNode = await nodeStore.upsert({
         where: {
           campaignId_entityType_sourceId: {
             campaignId: context.campaignId,
@@ -1010,7 +1023,7 @@ export class CoreService {
         });
 
         for (const linkedPage of linkedPages) {
-          const pageNode = await (tx as any).coreNode.upsert({
+          const pageNode = await nodeStore.upsert({
             where: {
               campaignId_entityType_sourceId: {
                 campaignId: context.campaignId,
@@ -1208,7 +1221,7 @@ export class CoreService {
       }));
 
     for (const tokenNode of tokenNodes) {
-      await prismaUnsafe.coreNode.upsert({
+      await getNodeStore(prismaUnsafe).upsert({
         where: {
           campaignId_entityType_sourceId: {
             campaignId: tokenNode.campaignId,

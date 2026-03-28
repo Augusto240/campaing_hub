@@ -214,7 +214,7 @@ model Campaign {
   knowledgeNodes KnowledgeNode[]
   knowledgeEdges KnowledgeEdge[]
   corePages CorePage[]
-  coreNodes CoreNode[]
+  coreNodes Node[]
   coreRelations CoreRelation[]
   compendiumCoreEntries CompendiumCoreEntry[]
   compendiumCoreFavorites CompendiumCoreFavorite[]
@@ -647,16 +647,19 @@ model CorePage {
   parent    CorePage? @relation("CorePageHierarchy", fields: [parentPageId], references: [id], onDelete: SetNull)
   children  CorePage[] @relation("CorePageHierarchy")
   creator   User     @relation("CorePageAuthor", fields: [createdBy], references: [id], onDelete: Cascade)
-  nodes     CoreNode[]
+  nodes     Node[]
 
   @@unique([campaignId, slug])
   @@index([campaignId, parentPageId])
   @@map("core_pages")
 }
 
-model CoreNode {
+model Node {
   id           String         @id @default(uuid())
   campaignId   String         @map("campaign_id")
+  type         String         @default("MEMORY")
+  title        String         @default("Untitled")
+  content      Json?
   pageId       String?        @map("page_id")
   entityType   CoreEntityType @map("entity_type")
   sourceId     String         @map("source_id")
@@ -668,12 +671,30 @@ model CoreNode {
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   page     CorePage? @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  relationsFrom NodeRelation[] @relation("from")
+  relationsTo   NodeRelation[] @relation("to")
   sourceRelations CoreRelation[] @relation("CoreRelationSource")
   targetRelations CoreRelation[] @relation("CoreRelationTarget")
 
   @@unique([campaignId, entityType, sourceId])
   @@index([campaignId, entityType])
+  @@index([campaignId, type])
   @@map("core_nodes")
+}
+
+model NodeRelation {
+  id     String @id @default(uuid())
+  fromId String @map("from_id")
+  toId   String @map("to_id")
+  type   String
+
+  from Node @relation("from", fields: [fromId], references: [id], onDelete: Cascade)
+  to   Node @relation("to", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId, type])
+  @@index([fromId])
+  @@index([toId])
+  @@map("node_relations")
 }
 
 model CoreRelation {
@@ -687,8 +708,8 @@ model CoreRelation {
   updatedAt    DateTime         @updatedAt @map("updated_at")
 
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  sourceNode CoreNode @relation("CoreRelationSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
-  targetNode CoreNode @relation("CoreRelationTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
+  sourceNode Node @relation("CoreRelationSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode Node @relation("CoreRelationTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
 
   @@unique([campaignId, relationType, sourceNodeId, targetNodeId])
   @@index([campaignId, relationType])

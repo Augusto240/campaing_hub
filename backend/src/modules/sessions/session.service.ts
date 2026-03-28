@@ -1,5 +1,6 @@
 import { prisma } from '../../config/database';
 import { emitCampaignEvent } from '../../config/realtime';
+import { deleteCacheByPattern } from '../../config/redis';
 import { AppError } from '../../utils/error-handler';
 import { CharacterService } from '../characters/character.service';
 import PDFDocument from 'pdfkit';
@@ -72,10 +73,58 @@ export class SessionService {
           },
         });
 
+        await tx.node.upsert({
+          where: {
+            campaignId_entityType_sourceId: {
+              campaignId,
+              entityType: 'SESSION',
+              sourceId: session.id,
+            },
+          },
+          update: {
+            type: 'SESSION',
+            title: session.summary?.trim() || `Session ${session.date.toISOString()}`,
+            content: {
+              sessionId: session.id,
+              date: session.date.toISOString(),
+              summary: session.summary,
+              xpAwarded: session.xpAwarded,
+            },
+            label: session.summary?.trim() || `Session ${session.date.toISOString()}`,
+            metadata: {
+              date: session.date.toISOString(),
+              xpAwarded: session.xpAwarded,
+            },
+          },
+          create: {
+            campaignId,
+            type: 'SESSION',
+            title: session.summary?.trim() || `Session ${session.date.toISOString()}`,
+            content: {
+              sessionId: session.id,
+              date: session.date.toISOString(),
+              summary: session.summary,
+              xpAwarded: session.xpAwarded,
+            },
+            entityType: 'SESSION',
+            sourceId: session.id,
+            label: session.summary?.trim() || `Session ${session.date.toISOString()}`,
+            metadata: {
+              date: session.date.toISOString(),
+              xpAwarded: session.xpAwarded,
+            },
+          },
+        });
+
         return session;
       },
       { isolationLevel: 'Serializable' }
     );
+
+    await Promise.all([
+      deleteCacheByPattern(`node:${createdSession.campaignId}:*`),
+      deleteCacheByPattern(`core:${createdSession.campaignId}:*`),
+    ]);
 
     emitCampaignEvent(createdSession.campaignId, 'session:created', {
       session: {
@@ -194,18 +243,52 @@ export class SessionService {
     sessionId: string,
     data: { date?: Date; summary?: string; xpAwarded?: number }
   ) {
-    return prisma.session.update({
-      where: { id: sessionId },
-      data,
-      include: {
-        campaign: {
-          select: {
-            id: true,
-            name: true,
+    const updated = await prisma.$transaction(async (tx) => {
+      const session = await tx.session.update({
+        where: { id: sessionId },
+        data,
+        include: {
+          campaign: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
-      },
+      });
+
+      await tx.node.updateMany({
+        where: {
+          campaignId: session.campaignId,
+          entityType: 'SESSION',
+          sourceId: session.id,
+        },
+        data: {
+          type: 'SESSION',
+          title: session.summary?.trim() || `Session ${session.date.toISOString()}`,
+          content: {
+            sessionId: session.id,
+            date: session.date.toISOString(),
+            summary: session.summary,
+            xpAwarded: session.xpAwarded,
+          },
+          label: session.summary?.trim() || `Session ${session.date.toISOString()}`,
+          metadata: {
+            date: session.date.toISOString(),
+            xpAwarded: session.xpAwarded,
+          },
+        },
+      });
+
+      return session;
     });
+
+    await Promise.all([
+      deleteCacheByPattern(`node:${updated.campaignId}:*`),
+      deleteCacheByPattern(`core:${updated.campaignId}:*`),
+    ]);
+
+    return updated;
   }
 
   async updateSessionLog(sessionId: string, data: SessionLogUpdateInput) {
@@ -243,9 +326,62 @@ export class SessionService {
   }
 
   async deleteSession(sessionId: string) {
-    await prisma.session.delete({
-      where: { id: sessionId },
+    const deleted = await prisma.$transaction(async (tx) => {
+      const session = await tx.session.findUnique({
+        where: { id: sessionId },
+        select: {
+          id: true,
+          campaignId: true,
+        },
+      });
+
+      if (!session) {
+        throw new AppError(404, 'Session not found');
+      }
+
+      const sessionNode = await tx.node.findFirst({
+        where: {
+          campaignId: session.campaignId,
+          entityType: 'SESSION',
+          sourceId: session.id,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (sessionNode) {
+        await Promise.all([
+          tx.nodeRelation.deleteMany({
+            where: {
+              OR: [{ fromId: sessionNode.id }, { toId: sessionNode.id }],
+            },
+          }),
+          tx.coreRelation.deleteMany({
+            where: {
+              OR: [{ sourceNodeId: sessionNode.id }, { targetNodeId: sessionNode.id }],
+            },
+          }),
+        ]);
+
+        await tx.node.delete({
+          where: {
+            id: sessionNode.id,
+          },
+        });
+      }
+
+      await tx.session.delete({
+        where: { id: sessionId },
+      });
+
+      return session;
     });
+
+    await Promise.all([
+      deleteCacheByPattern(`node:${deleted.campaignId}:*`),
+      deleteCacheByPattern(`core:${deleted.campaignId}:*`),
+    ]);
   }
 
   async generateReport(sessionId: string, viewerId: string): Promise<Buffer> {
