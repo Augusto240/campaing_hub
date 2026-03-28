@@ -42,7 +42,14 @@ export const wikiTimelineQuerySchema = z.object({
 
 export const createWikiFromTemplateSchema = z.object({
   title: z.string().trim().min(1).max(200),
-  templateKey: z.enum(['CHARACTER_DOSSIER', 'LOCATION_ATLAS', 'SESSION_CHRONICLE']),
+  templateKey: z.enum([
+    'CHARACTER_DOSSIER',
+    'LOCATION_ATLAS',
+    'SESSION_CHRONICLE',
+    'FACTION_DOSSIER',
+    'ENCOUNTER_BRIEF',
+    'GM_SESSION_PLAN',
+  ]),
   parentPageId: z.string().uuid().nullable().optional(),
   category: z
     .enum([

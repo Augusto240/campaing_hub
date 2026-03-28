@@ -33,6 +33,15 @@ const parseCharacterInventory = (value: unknown): CharacterInventory => {
 
 const normalize = (value: string): string => value.trim().toLowerCase();
 
+const hasWikiReference = (content: string, entryName: string): boolean => {
+  const normalizedContent = content.toLowerCase();
+  const normalizedName = entryName.toLowerCase();
+  return (
+    normalizedContent.includes(`[[${normalizedName}]]`) ||
+    normalizedContent.includes(`@${normalizedName}`)
+  );
+};
+
 export class CompendiumService {
   private async resolveCampaignContext(campaignId: string, userId: string) {
     const campaign = await prisma.campaign.findUnique({
@@ -76,7 +85,7 @@ export class CompendiumService {
     }
 
     const names = entries.map((entry) => entry.name);
-    const [combatants, characters] = await Promise.all([
+    const [combatants, characters, wikiPages] = await Promise.all([
       prisma.combatant.findMany({
         where: {
           encounter: {
@@ -109,6 +118,41 @@ export class CompendiumService {
           inventory: true,
         },
       }),
+      prisma.wikiPage.findMany({
+        where: {
+          campaignId,
+          OR: names.flatMap((name) => [
+            {
+              title: {
+                equals: name,
+                mode: 'insensitive' as const,
+              },
+            },
+            {
+              content: {
+                contains: `[[${name}]]`,
+                mode: 'insensitive' as const,
+              },
+            },
+            {
+              content: {
+                contains: `@${name}`,
+                mode: 'insensitive' as const,
+              },
+            },
+          ]),
+        },
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          updatedAt: true,
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        take: 240,
+      }),
     ]);
 
     const combatantsByName = new Map<string, Array<{ combatantId: string; sessionId: string }>>();
@@ -136,12 +180,28 @@ export class CompendiumService {
           characterName: character.name,
         }));
 
+      const wikiReferences = wikiPages
+        .filter((page) => {
+          if (normalize(page.title) === normalizedName) {
+            return true;
+          }
+
+          return hasWikiReference(page.content, entry.name);
+        })
+        .slice(0, 5)
+        .map((page) => ({
+          wikiPageId: page.id,
+          title: page.title,
+          updatedAt: page.updatedAt,
+        }));
+
       return {
         ...entry,
         links: {
           usedInSessions: Array.from(new Set(combatLinks.map((entryLink) => entryLink.sessionId))),
           usedAsCombatantCount: combatLinks.length,
           linkedCharacters: characterLinks,
+          referencedInWiki: wikiReferences,
         },
       };
     });

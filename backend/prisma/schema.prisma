@@ -95,6 +95,35 @@ enum GraphEdgeType {
   COMPENDIUM_REFERENCE
 }
 
+enum CoreEntityType {
+  PAGE
+  CHARACTER
+  SESSION
+  COMPENDIUM_ENTRY
+  VTT_TOKEN
+  LEGACY_ANCHOR
+}
+
+enum CoreRelationType {
+  PARENT_OF
+  LINKS_TO
+  REFERENCES
+  APPEARS_IN
+  LOCATED_IN
+}
+
+enum CompendiumCoreKind {
+  CREATURE
+  SPELL
+  ITEM
+}
+
+enum CompendiumCoreSource {
+  SRD
+  HOMEBREW
+  LEGACY
+}
+
 model User {
   id           String   @id @default(uuid())
   name         String
@@ -118,6 +147,10 @@ model User {
   creatures       Creature[]       @relation("CreatureAuthor")
   sessionProposals SessionProposal[] @relation("SessionProposalAuthor")
   sessionVotes    SessionVote[]
+  corePages       CorePage[]       @relation("CorePageAuthor")
+  compendiumCoreEntries CompendiumCoreEntry[] @relation("CompendiumCoreEntryAuthor")
+  compendiumCoreFavorites CompendiumCoreFavorite[]
+  updatedVttStates VttState[]      @relation("VttStateUpdater")
 
   @@map("users")
 }
@@ -180,6 +213,12 @@ model Campaign {
   sessionProposals SessionProposal[]
   knowledgeNodes KnowledgeNode[]
   knowledgeEdges KnowledgeEdge[]
+  corePages CorePage[]
+  coreNodes CoreNode[]
+  coreRelations CoreRelation[]
+  compendiumCoreEntries CompendiumCoreEntry[]
+  compendiumCoreFavorites CompendiumCoreFavorite[]
+  vttState VttState?
 
   @@map("campaigns")
 }
@@ -252,6 +291,7 @@ model Session {
   sanityEvents SanityEvent[]
   spellCasts   SpellCast[]
   combatEncounters CombatEncounter[]
+  vttStates    VttState[]
 
   @@map("sessions")
 }
@@ -403,6 +443,7 @@ model WikiPage {
   author   User     @relation("WikiPageAuthor", fields: [createdBy], references: [id], onDelete: Cascade)
   blocks   WikiBlock[]
   favorites WikiFavorite[]
+  corePage CorePage?
 
   @@index([campaignId, category])
   @@index([campaignId, parentPageId])
@@ -585,4 +626,132 @@ model KnowledgeEdge {
   @@index([campaignId, edgeType])
   @@unique([campaignId, edgeType, sourceNodeId, targetNodeId])
   @@map("knowledge_edges")
+}
+
+model CorePage {
+  id           String   @id @default(uuid())
+  campaignId   String   @map("campaign_id")
+  wikiPageId   String?  @unique @map("wiki_page_id")
+  parentPageId String?  @map("parent_page_id")
+  title        String
+  slug         String
+  pageType     String   @default("WIKI") @map("page_type")
+  summary      String?
+  metadata     Json     @default("{}")
+  createdBy    String   @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  wikiPage  WikiPage? @relation(fields: [wikiPageId], references: [id], onDelete: SetNull)
+  parent    CorePage? @relation("CorePageHierarchy", fields: [parentPageId], references: [id], onDelete: SetNull)
+  children  CorePage[] @relation("CorePageHierarchy")
+  creator   User     @relation("CorePageAuthor", fields: [createdBy], references: [id], onDelete: Cascade)
+  nodes     CoreNode[]
+
+  @@unique([campaignId, slug])
+  @@index([campaignId, parentPageId])
+  @@map("core_pages")
+}
+
+model CoreNode {
+  id           String         @id @default(uuid())
+  campaignId   String         @map("campaign_id")
+  pageId       String?        @map("page_id")
+  entityType   CoreEntityType @map("entity_type")
+  sourceId     String         @map("source_id")
+  label        String
+  legacyAnchor Boolean        @default(false) @map("legacy_anchor")
+  metadata     Json           @default("{}")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  page     CorePage? @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  sourceRelations CoreRelation[] @relation("CoreRelationSource")
+  targetRelations CoreRelation[] @relation("CoreRelationTarget")
+
+  @@unique([campaignId, entityType, sourceId])
+  @@index([campaignId, entityType])
+  @@map("core_nodes")
+}
+
+model CoreRelation {
+  id           String           @id @default(uuid())
+  campaignId   String           @map("campaign_id")
+  relationType CoreRelationType @map("relation_type")
+  sourceNodeId String           @map("source_node_id")
+  targetNodeId String           @map("target_node_id")
+  metadata     Json             @default("{}")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sourceNode CoreNode @relation("CoreRelationSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode CoreNode @relation("CoreRelationTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, relationType, sourceNodeId, targetNodeId])
+  @@index([campaignId, relationType])
+  @@map("core_relations")
+}
+
+model CompendiumCoreEntry {
+  id         String               @id @default(uuid())
+  campaignId String?              @map("campaign_id")
+  systemSlug String               @map("system_slug")
+  kind       CompendiumCoreKind
+  source     CompendiumCoreSource @default(HOMEBREW)
+  name       String
+  summary    String?
+  tags       String[]             @default([])
+  content    Json                 @default("{}")
+  createdBy  String?              @map("created_by")
+  createdAt  DateTime             @default(now()) @map("created_at")
+  updatedAt  DateTime             @updatedAt @map("updated_at")
+
+  campaign  Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creator   User?     @relation("CompendiumCoreEntryAuthor", fields: [createdBy], references: [id], onDelete: SetNull)
+  favorites CompendiumCoreFavorite[]
+
+  @@index([campaignId, kind])
+  @@index([systemSlug, kind, name])
+  @@map("compendium_core_entries")
+}
+
+model CompendiumCoreFavorite {
+  id         String   @id @default(uuid())
+  entryId    String   @map("entry_id")
+  campaignId String   @map("campaign_id")
+  userId     String   @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  entry    CompendiumCoreEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  campaign Campaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, campaignId, userId])
+  @@index([campaignId, userId])
+  @@map("compendium_core_favorites")
+}
+
+model VttState {
+  id          String   @id @default(uuid())
+  campaignId  String   @unique @map("campaign_id")
+  sessionId   String?  @map("session_id")
+  mapImageUrl String?  @map("map_image_url")
+  gridSize    Int      @default(56) @map("grid_size")
+  tokens      Json     @default("[]")
+  fogState    Json     @default("{}") @map("fog_state")
+  lights      Json     @default("[]")
+  metadata    Json     @default("{}")
+  updatedBy   String   @map("updated_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  session  Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  updater  User     @relation("VttStateUpdater", fields: [updatedBy], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("vtt_states")
 }

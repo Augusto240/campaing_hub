@@ -4,6 +4,7 @@ import { canManageCampaign, isCampaignMember } from '../../middlewares/permissio
 import {
   addWikiFavorite,
   bootstrapLegacyWiki,
+  bootstrapStarterWikiPack,
   createWikiFromTemplate,
   createWikiPage,
   deleteWikiPage,
@@ -28,6 +29,7 @@ router.use(authenticate);
 
 router.get('/templates', getWikiTemplates);
 router.post('/campaign/:campaignId/bootstrap-legacy', canManageCampaign, bootstrapLegacyWiki);
+router.post('/campaign/:campaignId/bootstrap-starter-pack', canManageCampaign, bootstrapStarterWikiPack);
 router.post('/campaign/:campaignId/from-template', isCampaignMember, createWikiFromTemplate);
 router.get('/campaign/:campaignId', isCampaignMember, getCampaignWikiPages);
 router.get('/campaign/:campaignId/tree', isCampaignMember, getCampaignWikiTree);

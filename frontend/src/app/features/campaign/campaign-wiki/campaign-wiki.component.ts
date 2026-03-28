@@ -71,6 +71,9 @@ type EditableWikiBlock = {
         <button class="btn btn-outline" (click)="bootstrapLegacy()" [disabled]="bootstrappingLegacy">
           {{ bootstrappingLegacy ? 'Importando legado...' : 'Importar Legado 2023' }}
         </button>
+        <button class="btn btn-outline" (click)="bootstrapStarterPack()" [disabled]="bootstrappingStarter">
+          {{ bootstrappingStarter ? 'Ativando mesa viva...' : 'Ativar Starter Pack Mesa Viva' }}
+        </button>
         <button class="btn btn-outline" (click)="openTemplateCreator()">Usar Template</button>
         <button class="btn btn-primary" (click)="startCreate()">+ Nova P├ígina</button>
       </div>
@@ -710,6 +713,7 @@ export class CampaignWikiComponent implements OnInit {
   loadingRelations = false;
   loadingBlocks = false;
   bootstrappingLegacy = false;
+  bootstrappingStarter = false;
   legacyMessage = '';
   templateCreatorVisible = false;
   creatingFromTemplate = false;
@@ -750,7 +754,7 @@ export class CampaignWikiComponent implements OnInit {
 
   templateForm: {
     title: string;
-    templateKey: 'CHARACTER_DOSSIER' | 'LOCATION_ATLAS' | 'SESSION_CHRONICLE';
+    templateKey: WikiTemplate['key'];
     parentPageId: string;
     isPublic: boolean;
   } = {
@@ -1317,13 +1321,37 @@ export class CampaignWikiComponent implements OnInit {
     this.wikiService.bootstrapLegacy(this.campaignId).subscribe({
       next: (response) => {
         const result = response.data;
-        this.legacyMessage = `Legado sincronizado: ${result.createdCount} p├ígina(s) criada(s), ${result.skippedCount} j├í existiam.`;
+        this.legacyMessage = `Legado sincronizado: ${result.created} pagina(s) criada(s), ${result.skipped} ja existiam.`;
         this.bootstrappingLegacy = false;
         this.loadPages();
       },
       error: () => {
         this.legacyMessage = 'N├úo foi poss├¡vel importar o legado. Verifique permiss├Áes de GM nesta campanha.';
         this.bootstrappingLegacy = false;
+      },
+    });
+  }
+
+  bootstrapStarterPack(): void {
+    if (!this.campaignId || this.bootstrappingStarter) {
+      return;
+    }
+
+    this.bootstrappingStarter = true;
+    this.legacyMessage = '';
+
+    this.wikiService.bootstrapStarterPack(this.campaignId).subscribe({
+      next: (response) => {
+        const result = response.data;
+        this.legacyMessage =
+          `Starter pack ativo: ${result.starter.created} pagina(s) nova(s), ` +
+          `${result.starter.skipped} existente(s), legado sincronizado ${result.legacy.created} nova(s).`;
+        this.bootstrappingStarter = false;
+        this.loadPages();
+      },
+      error: () => {
+        this.legacyMessage = 'Falha ao ativar starter pack. Verifique permissoes de GM nesta campanha.';
+        this.bootstrappingStarter = false;
       },
     });
   }

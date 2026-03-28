@@ -363,7 +363,13 @@ export interface WikiBlock {
 }
 
 export interface WikiTemplate {
-  key: 'CHARACTER_DOSSIER' | 'LOCATION_ATLAS' | 'SESSION_CHRONICLE';
+  key:
+    | 'CHARACTER_DOSSIER'
+    | 'LOCATION_ATLAS'
+    | 'SESSION_CHRONICLE'
+    | 'FACTION_DOSSIER'
+    | 'ENCOUNTER_BRIEF'
+    | 'GM_SESSION_PLAN';
   name: string;
   description: string;
   category: WikiCategory;
@@ -424,6 +430,11 @@ export interface CompendiumEntry {
     usedInSessions: string[];
     usedAsCombatantCount: number;
     linkedCharacters: CompendiumLinkedCharacter[];
+    referencedInWiki: Array<{
+      wikiPageId: string;
+      title: string;
+      updatedAt: string;
+    }>;
   };
 }
 
@@ -484,6 +495,105 @@ export interface CampaignKnowledgeGraph {
   };
   nodes: KnowledgeGraphNode[];
   edges: KnowledgeGraphEdge[];
+}
+
+export type CoreCompendiumKind = 'CREATURE' | 'SPELL' | 'ITEM';
+
+export type CoreCompendiumSource = 'SRD' | 'HOMEBREW' | 'LEGACY';
+
+export interface CoreCompendiumEntry {
+  id: string;
+  systemSlug: string;
+  kind: CoreCompendiumKind;
+  source: CoreCompendiumSource;
+  name: string;
+  summary: string;
+  tags: string[];
+  content: Record<string, unknown>;
+  origin: 'STATIC' | 'CAMPAIGN';
+}
+
+export interface CoreCompendiumView {
+  campaignId: string;
+  systemSlug: string;
+  creatures: CoreCompendiumEntry[];
+  spells: CoreCompendiumEntry[];
+  items: CoreCompendiumEntry[];
+}
+
+export interface CoreTabletopToken {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  color: string;
+  size: number;
+}
+
+export interface CoreTabletopFog {
+  cellSize: number;
+  opacity: number;
+  maskedCells: string[];
+}
+
+export interface CoreTabletopLight {
+  id: string;
+  x: number;
+  y: number;
+  radius: number;
+  intensity: number;
+  color: string;
+}
+
+export interface CoreTabletopState {
+  mapImageUrl: string | null;
+  gridSize: number;
+  tokens: CoreTabletopToken[];
+  fog: CoreTabletopFog;
+  lights: CoreTabletopLight[];
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface CoreVttSnapshot {
+  campaignId: string;
+  sessionId: string | null;
+  state: CoreTabletopState;
+  metadata: Record<string, unknown>;
+}
+
+export interface CoreCampaignSnapshot {
+  campaignId: string;
+  generatedAt: string;
+  founders: {
+    augustusFrostborne: boolean;
+    satoruNaitokira: boolean;
+  };
+  wiki: {
+    totalPages: number;
+    pages: Array<{
+      id: string;
+      title: string;
+      category: WikiCategory;
+      parentPageId: string | null;
+      tags: string[];
+      isPublic: boolean;
+      updatedAt: string;
+    }>;
+  };
+  compendium: CoreCompendiumView;
+  vtt: CoreVttSnapshot;
+  graph: {
+    stats: {
+      nodes: number;
+      edges: number;
+      legacyAnchors: number;
+    };
+  };
+  characters: Array<{
+    id: string;
+    name: string;
+  }>;
 }
 
 // ============================================================================
@@ -644,7 +754,13 @@ export interface UpdateWikiPageInput {
 
 export interface CreateWikiFromTemplateInput {
   title: string;
-  templateKey: 'CHARACTER_DOSSIER' | 'LOCATION_ATLAS' | 'SESSION_CHRONICLE';
+  templateKey:
+    | 'CHARACTER_DOSSIER'
+    | 'LOCATION_ATLAS'
+    | 'SESSION_CHRONICLE'
+    | 'FACTION_DOSSIER'
+    | 'ENCOUNTER_BRIEF'
+    | 'GM_SESSION_PLAN';
   parentPageId?: string | null;
   category?: WikiCategory;
   tags?: string[];

@@ -183,6 +183,15 @@ const COMPENDIUM_TABS: Array<{ label: string; kind: CompendiumKind }> = [
               <li *ngFor="let sessionId of entry.links.usedInSessions">{{ sessionId }}</li>
             </ul>
           </div>
+
+          <div class="abilities" *ngIf="entry.links.referencedInWiki.length > 0">
+            <strong>Referenciado na wiki:</strong>
+            <ul>
+              <li *ngFor="let wikiRef of entry.links.referencedInWiki">
+                {{ wikiRef.title }}
+              </li>
+            </ul>
+          </div>
         </article>
       </div>
 

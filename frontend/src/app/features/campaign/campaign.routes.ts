@@ -26,6 +26,10 @@ export const CAMPAIGN_ROUTES: Routes = [
     loadComponent: () => import('./campaign-compendium/campaign-compendium.component').then(m => m.CampaignCompendiumComponent)
   },
   {
+    path: ':id/os',
+    loadComponent: () => import('./campaign-os/campaign-os.component').then(m => m.CampaignOsComponent)
+  },
+  {
     path: ':id/vtt',
     loadComponent: () => import('./campaign-vtt/campaign-vtt.component').then(m => m.CampaignVttComponent)
   },

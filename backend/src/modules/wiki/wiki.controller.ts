@@ -331,3 +331,20 @@ export const bootstrapLegacyWiki = asyncHandler(
     res.status(201).json(success(result, 'Legacy canon pages imported successfully'));
   }
 );
+
+/**
+ * POST /api/wiki/campaign/:campaignId/bootstrap-starter-pack
+ * Importa pacote inicial de mesa viva (inclui legado + paginas editoriais).
+ */
+export const bootstrapStarterWikiPack = asyncHandler(
+  async (req: AuthRequest, res: Response, _next: NextFunction) => {
+    const { campaignId } = validate(campaignIdParamsSchema, req.params);
+
+    const result = await wikiService.bootstrapStarterPack({
+      campaignId,
+      userId: req.user!.id,
+    });
+
+    res.status(201).json(success(result, 'Starter wiki pack imported successfully'));
+  }
+);

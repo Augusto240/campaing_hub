@@ -33,6 +33,7 @@ Projeto legado (2023) preservado: personagens fundadores Augustus Frostborne e S
   - features/campaign/campaign-vtt: chat e rolagens de mesa
   - features/campaign/campaign-compendium: bestiario + regras (magias/itens/classes)
 - backend/ (Express)
+  - modules/core: backbone unificado Page/Node/Relation + compendium homebrew + VTT persistido
   - modules/wiki: wiki, blocos, favoritos, templates, legado, FTS, backlinks
   - modules/knowledge-graph: agregacao de nos/arestas entre entidades da campanha
   - modules/compendium: compendio unificado por campanha/sistema
@@ -54,10 +55,11 @@ Concluido no MVP avancado:
 
 ### 2) Sistema Notion-like
 Concluido no MVP avancado:
-- [x] Templates de pagina (personagem/local/sessao)
+- [x] Templates de pagina (personagem/local/sessao/faccao/encontro/plano de mestre)
 - [x] Mencoes internas com sintaxe @ e [[...]]
 - [x] Sidebar hierarquica com drag-and-drop para reorganizacao
 - [x] Favoritos e relacoes contextuais
+- [x] Starter pack de mesa viva para preencher wiki com conteudo inicial util
 
 ### 3) Mesa Virtual (VTT) MVP
 Concluido no MVP funcional:
@@ -74,6 +76,8 @@ Concluido no MVP funcional:
 - [x] Tipos navegaveis e filtraveis: bestiary, spell, item, class
 - [x] Suporte multi-sistema: dnd5e, coc7e, tormenta20
 - [x] Vinculos de uso com sessoes e personagens (quando aplicavel)
+- [x] Referencias cruzadas compendio <-> wiki por titulo e citacao
+- [x] Conteudo inicial expandido (criaturas, magias, itens, condicoes, subclasses, ancestrais e regras rapidas)
 
 ### 5) Infra de suporte
 Concluido:
@@ -91,6 +95,7 @@ Concluido:
 - GET /api/wiki/:wikiPageId/relations
 - PUT /api/wiki/:wikiPageId/blocks
 - POST /api/wiki/campaign/:campaignId/bootstrap-legacy
+- POST /api/wiki/campaign/:campaignId/bootstrap-starter-pack
 
 ### Knowledge Graph
 - GET /api/knowledge-graph/campaign/:campaignId?limit=140
@@ -99,6 +104,17 @@ Concluido:
 - GET /api/compendium/campaign/:campaignId?kind=bestiary|spell|item|class&search=...
 - GET /api/compendium/campaign/:campaignId/kinds
 - GET /api/compendium/system/:systemSlug?kind=...&search=...
+
+### Core Backbone Unificado
+- GET /api/core/campaign/:campaignId/snapshot?limit=160
+- POST /api/core/campaign/:campaignId/pages
+- PUT /api/core/pages/:wikiPageId/blocks
+- GET /api/core/pages/:wikiPageId/backlinks?limit=12
+- GET /api/core/campaign/:campaignId/search?query=...
+- GET /api/core/campaign/:campaignId/compendium?kind=CREATURE|SPELL|ITEM&search=...
+- POST /api/core/campaign/:campaignId/compendium/homebrew
+- GET /api/core/campaign/:campaignId/vtt-state
+- PUT /api/core/campaign/:campaignId/vtt-state
 
 ### Tabletop realtime (Socket.IO)
 - campaign:join / campaign:leave
@@ -117,6 +133,7 @@ Migrations importantes recentes:
 - phase9_wiki_notion_blocks
 - phase10_wiki_fulltext_search (GIN em wiki_pages)
 - phase11_knowledge_graph_core
+- phase12_core_backbone (core_pages/core_nodes/core_relations + vtt_states + compendium_core_entries)
 
 ## Quick Start (Docker)
 

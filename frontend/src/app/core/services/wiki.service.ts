@@ -139,17 +139,31 @@ export class WikiService {
 
   bootstrapLegacy(campaignId: string): Observable<
     ApiResponse<{
-      createdCount: number;
-      skippedCount: number;
-      createdPages: Array<{ id: string; title: string; category: WikiCategory }>;
+      created: number;
+      skipped: number;
+      total: number;
     }>
   > {
     return this.http.post<
       ApiResponse<{
-        createdCount: number;
-        skippedCount: number;
-        createdPages: Array<{ id: string; title: string; category: WikiCategory }>;
+        created: number;
+        skipped: number;
+        total: number;
       }>
     >(`${this.API_URL}/campaign/${campaignId}/bootstrap-legacy`, {});
+  }
+
+  bootstrapStarterPack(campaignId: string): Observable<
+    ApiResponse<{
+      legacy: { created: number; skipped: number; total: number };
+      starter: { created: number; skipped: number; total: number };
+    }>
+  > {
+    return this.http.post<
+      ApiResponse<{
+        legacy: { created: number; skipped: number; total: number };
+        starter: { created: number; skipped: number; total: number };
+      }>
+    >(`${this.API_URL}/campaign/${campaignId}/bootstrap-starter-pack`, {});
   }
 }

@@ -2,6 +2,7 @@ import { Prisma, WikiBlockType, WikiCategory } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { AppError } from '../../utils/error-handler';
 import { LEGACY_WIKI_SEED } from './wiki-legacy-content';
+import { STARTER_WIKI_PACK } from './wiki-starter-content';
 
 type PrismaClientLike = Prisma.TransactionClient | typeof prisma;
 
@@ -56,6 +57,11 @@ interface BootstrapLegacyInput {
   userId: string;
 }
 
+interface BootstrapStarterInput {
+  campaignId: string;
+  userId: string;
+}
+
 interface CreateWikiFromTemplateInput {
   campaignId: string;
   userId: string;
@@ -76,7 +82,13 @@ interface UpsertWikiBlocksInput {
   }>;
 }
 
-type WikiTemplateKey = 'CHARACTER_DOSSIER' | 'LOCATION_ATLAS' | 'SESSION_CHRONICLE';
+type WikiTemplateKey =
+  | 'CHARACTER_DOSSIER'
+  | 'LOCATION_ATLAS'
+  | 'SESSION_CHRONICLE'
+  | 'FACTION_DOSSIER'
+  | 'ENCOUNTER_BRIEF'
+  | 'GM_SESSION_PLAN';
 
 type WikiTemplateDefinition = {
   key: WikiTemplateKey;
@@ -241,6 +253,106 @@ export class WikiService {
               { text: 'Registrar loot principal', checked: false },
               { text: 'Registrar gancho da proxima sessao', checked: false },
             ],
+          },
+        },
+      ],
+    },
+    {
+      key: 'FACTION_DOSSIER',
+      name: 'Dossie de Faccao',
+      description: 'Template para mapear lideranca, objetivos, recursos e conflitos da faccao.',
+      category: 'FACTION',
+      tags: ['template', 'faccao', 'politica', 'mesa-viva'],
+      blocks: [
+        {
+          blockType: 'TEXT',
+          payload: {
+            content: '## Identidade\nQuem e a faccao, como opera e qual sua marca na campanha?',
+          },
+        },
+        {
+          blockType: 'TABLE',
+          payload: {
+            columns: ['Elemento', 'Descricao', 'Risco'],
+            rows: [
+              ['Lideranca', 'Nome do lider', 'Medio'],
+              ['Objetivo atual', 'Meta imediata', 'Alto'],
+              ['Recurso chave', 'Ativo principal', 'Variavel'],
+            ],
+          },
+        },
+        {
+          blockType: 'CHECKLIST',
+          payload: {
+            items: [
+              { text: 'Vincular ao menos um local', checked: false },
+              { text: 'Definir relacao com personagens', checked: false },
+              { text: 'Registrar ponto fraco exploravel', checked: false },
+            ],
+          },
+        },
+      ],
+    },
+    {
+      key: 'ENCOUNTER_BRIEF',
+      name: 'Briefing de Encontro',
+      description: 'Template para encontro tatico com pistas, risco e consequencia narrativa.',
+      category: 'SESSION_RECAP',
+      tags: ['template', 'encontro', 'combate', 'sessao'],
+      blocks: [
+        {
+          blockType: 'CALLOUT',
+          payload: {
+            title: 'Objetivo do encontro',
+            content: 'Defina em uma frase o que esta em jogo para os personagens.',
+          },
+        },
+        {
+          blockType: 'TABLE',
+          payload: {
+            columns: ['Fase', 'Descricao', 'Teste sugerido'],
+            rows: [
+              ['Abertura', 'Pressao inicial', '1d20+WIS'],
+              ['Escalada', 'Complicacao principal', '1d20+DEX'],
+              ['Fecho', 'Consequencia imediata', '1d20+CHA'],
+            ],
+          },
+        },
+        {
+          blockType: 'TEXT',
+          payload: {
+            content: '## Referencias\n- Criaturas do compendio\n- Itens de recompensa\n- Links de wiki',
+          },
+        },
+      ],
+    },
+    {
+      key: 'GM_SESSION_PLAN',
+      name: 'Plano de Sessao do Mestre',
+      description: 'Template de comando para preparar sessao com cenas, ganchos e contingencias.',
+      category: 'SESSION_RECAP',
+      tags: ['template', 'mestre', 'sessao', 'planejamento'],
+      blocks: [
+        {
+          blockType: 'TEXT',
+          payload: {
+            content: '## Cena de abertura\nDescreva clima, local e conflito inicial em ate 6 linhas.',
+          },
+        },
+        {
+          blockType: 'CHECKLIST',
+          payload: {
+            items: [
+              { text: 'Definir 3 pistas narrativas', checked: false },
+              { text: 'Definir 2 encontros alternativos', checked: false },
+              { text: 'Definir gancho final da sessao', checked: false },
+            ],
+          },
+        },
+        {
+          blockType: 'QUOTE',
+          payload: {
+            content: '"A mesa nao precisa de perfeicao. Precisa de direcao e ritmo."',
           },
         },
       ],
@@ -1954,6 +2066,114 @@ export class WikiService {
 
   async bootstrapLegacyCanon(input: BootstrapLegacyInput) {
     return this.seedLegacyPages(input);
+  }
+
+  async bootstrapStarterPack(input: BootstrapStarterInput) {
+    const access = await this.getCampaignAccess(input.campaignId, input.userId);
+
+    if (!access.isGm) {
+      throw new AppError(403, 'Only GMs can bootstrap starter content');
+    }
+
+    const legacyResult = await this.seedLegacyPages(input);
+
+    const starterResult = await prisma.$transaction(async (tx) => {
+      const sourceToPageId = new Map<string, string>();
+      let created = 0;
+      let skipped = 0;
+
+      for (const entry of STARTER_WIKI_PACK) {
+        const existingPage = await tx.wikiPage.findFirst({
+          where: {
+            campaignId: input.campaignId,
+            OR: [{ legacySource: entry.starterSource }, { title: entry.title }],
+          },
+          select: {
+            id: true,
+            legacySource: true,
+          },
+        });
+
+        let parentPageId: string | null = null;
+        if (entry.parentStarterSource) {
+          parentPageId = sourceToPageId.get(entry.parentStarterSource) ?? null;
+
+          if (!parentPageId) {
+            const parentBySource = await tx.wikiPage.findFirst({
+              where: {
+                campaignId: input.campaignId,
+                legacySource: entry.parentStarterSource,
+              },
+              select: {
+                id: true,
+              },
+            });
+
+            parentPageId = parentBySource?.id ?? null;
+          }
+        }
+
+        if (existingPage) {
+          if (!existingPage.legacySource) {
+            await tx.wikiPage.update({
+              where: {
+                id: existingPage.id,
+              },
+              data: {
+                legacySource: entry.starterSource,
+                parentPageId,
+              },
+            });
+          }
+
+          sourceToPageId.set(entry.starterSource, existingPage.id);
+          skipped += 1;
+          continue;
+        }
+
+        const createdPage = await tx.wikiPage.create({
+          data: {
+            campaignId: input.campaignId,
+            parentPageId,
+            legacySource: entry.starterSource,
+            title: entry.title,
+            content: entry.content,
+            category: entry.category,
+            tags: entry.tags,
+            createdBy: input.userId,
+            isPublic: entry.isPublic,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (entry.blocks && entry.blocks.length > 0) {
+          await tx.wikiBlock.createMany({
+            data: entry.blocks.map((block, index) => ({
+              wikiPageId: createdPage.id,
+              blockType: block.blockType,
+              sortOrder: index,
+              payload: block.payload as Prisma.InputJsonValue,
+            })),
+          });
+        }
+
+        sourceToPageId.set(entry.starterSource, createdPage.id);
+        created += 1;
+      }
+
+      return {
+        created,
+        skipped,
+        total: STARTER_WIKI_PACK.length,
+      };
+    });
+
+    return {
+      legacy: legacyResult,
+      starter: starterResult,
+    };
   }
 }
 
