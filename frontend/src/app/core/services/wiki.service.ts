@@ -9,6 +9,7 @@ import {
   WikiBlock,
   WikiFavorite,
   WikiMentionSuggestion,
+  WikiTimelineEntry,
   WikiPageRelations,
   WikiPage,
   WikiTemplate,
@@ -114,6 +115,14 @@ export class WikiService {
       `${this.API_URL}/campaign/${campaignId}/mentions`,
       { params }
     );
+  }
+
+  getCampaignTimeline(campaignId: string, limit = 20): Observable<ApiResponse<WikiTimelineEntry[]>> {
+    const params = new HttpParams().set('limit', String(limit));
+
+    return this.http.get<ApiResponse<WikiTimelineEntry[]>>(`${this.API_URL}/campaign/${campaignId}/timeline`, {
+      params,
+    });
   }
 
   createPage(payload: CreateWikiPagePayload): Observable<ApiResponse<WikiPage>> {

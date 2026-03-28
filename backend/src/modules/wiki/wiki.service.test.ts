@@ -22,6 +22,9 @@ const mockPrisma = {
   creature: {
     findMany: jest.fn(),
   },
+  event: {
+    findMany: jest.fn(),
+  },
   wikiPage: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
@@ -49,6 +52,7 @@ describe('WikiService', () => {
     mockPrisma.session.findMany.mockResolvedValue([]);
     mockPrisma.item.findMany.mockResolvedValue([]);
     mockPrisma.creature.findMany.mockResolvedValue([]);
+    mockPrisma.event.findMany.mockResolvedValue([]);
     mockPrisma.$queryRaw.mockResolvedValue([]);
   });
 
@@ -358,6 +362,68 @@ describe('WikiService', () => {
               },
             },
           ]),
+        }),
+      })
+    );
+  });
+
+  it('should return a sorted campaign timeline with legacy anchors', async () => {
+    mockPrisma.campaign.findUnique.mockResolvedValue({
+      id: 'campaign-1',
+      ownerId: 'owner-1',
+      members: [{ role: 'PLAYER' }],
+    });
+
+    mockPrisma.wikiPage.findMany.mockResolvedValue([
+      {
+        id: 'wiki-1',
+        campaignId: 'campaign-1',
+        title: 'Canon 2023 - Augustus Frostborne',
+        content: 'Registro principal da campanha.',
+        category: 'NPC',
+        tags: ['legado-2023'],
+        legacySource: 'legacy:augustus',
+        updatedAt: new Date('2026-03-27T12:00:00.000Z'),
+      },
+    ]);
+
+    mockPrisma.session.findMany.mockResolvedValue([
+      {
+        id: 'session-1',
+        campaignId: 'campaign-1',
+        date: new Date('2026-03-28T12:00:00.000Z'),
+        summary: 'Confronto final com Satoru Naitokira',
+        narrativeLog: null,
+        highlights: ['duelo', 'portal'],
+      },
+    ]);
+
+    mockPrisma.event.findMany.mockResolvedValue([
+      {
+        id: 'event-1',
+        campaignId: 'campaign-1',
+        title: 'Ruptura do Nevoeiro',
+        description: 'A fronteira entre mundos abriu por instantes.',
+        eventDate: new Date('2026-03-29T12:00:00.000Z'),
+        type: 'STORY',
+      },
+    ]);
+
+    const service = new WikiService();
+    const timeline = await service.listCampaignTimeline('campaign-1', 'user-1', 10);
+
+    expect(timeline).toHaveLength(3);
+    expect(timeline[0].kind).toBe('EVENT');
+    expect(timeline[1].kind).toBe('SESSION');
+    expect(timeline[2].kind).toBe('WIKI_PAGE');
+    expect(timeline[1].legacyAnchor).toBe(true);
+    expect(timeline[2].legacyAnchor).toBe(true);
+
+    expect(mockPrisma.wikiPage.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          campaignId: 'campaign-1',
+          isPublic: true,
         }),
       })
     );

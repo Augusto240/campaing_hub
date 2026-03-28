@@ -11,6 +11,7 @@ import {
   updateWikiPageSchema,
   upsertWikiBlocksSchema,
   wikiMentionsQuerySchema,
+  wikiTimelineQuerySchema,
   wikiRelationsQuerySchema,
   wikiPageIdParamsSchema,
 } from './wiki.validation';
@@ -54,6 +55,21 @@ export const getCampaignWikiTree = asyncHandler(
     });
 
     res.json(success(tree, 'Wiki tree retrieved successfully'));
+  }
+);
+
+/**
+ * GET /api/wiki/campaign/:campaignId/timeline
+ * Retorna timeline viva da campanha (wiki, sessoes e eventos).
+ */
+export const getCampaignWikiTimeline = asyncHandler(
+  async (req: AuthRequest, res: Response, _next: NextFunction) => {
+    const { campaignId } = validate(campaignIdParamsSchema, req.params);
+    const { limit } = validate(wikiTimelineQuerySchema, req.query);
+
+    const timeline = await wikiService.listCampaignTimeline(campaignId, req.user!.id, limit);
+
+    res.json(success(timeline, 'Wiki timeline retrieved successfully'));
   }
 );
 

@@ -4,12 +4,15 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import { WikiService } from '../../../core/services/wiki.service';
+import { KnowledgeGraphService } from '../../../core/services/knowledge-graph.service';
 import {
+  CampaignKnowledgeGraph,
   WikiBlock,
   WikiCategory,
   WikiFavorite,
   WikiPage,
   WikiPageRelations,
+  WikiTimelineEntry,
   WikiTemplate,
   WikiTreeNode,
 } from '../../../core/types';
@@ -126,6 +129,39 @@ type EditableWikiBlock = {
             <div class="section-label">Favoritos</div>
             <button class="wiki-list-item" *ngFor="let favorite of favorites" (click)="openPageById(favorite.page.id)">
               <div class="title">Ôÿà {{ favorite.page.title }}</div>
+            </button>
+          </div>
+
+          <div class="timeline-box" *ngIf="timeline.length > 0">
+            <div class="section-label">Timeline Viva</div>
+            <button class="timeline-item" *ngFor="let entry of timeline" (click)="openTimelineEntry(entry)">
+              <div class="timeline-title">{{ entry.title }}</div>
+              <div class="timeline-meta">
+                <span>{{ formatTimelineKind(entry.kind) }}</span>
+                <span>{{ entry.happenedAt | date:'dd/MM HH:mm' }}</span>
+                <span *ngIf="entry.legacyAnchor" class="badge badge-warning">LEGADO</span>
+              </div>
+              <div class="timeline-summary" *ngIf="entry.summary">{{ entry.summary }}</div>
+            </button>
+          </div>
+
+          <div class="graph-box" *ngIf="knowledgeGraph">
+            <div class="section-label">Knowledge Graph</div>
+            <div class="graph-stats">
+              <span>Nós: {{ knowledgeGraph.stats.nodes }}</span>
+              <span>Arestas: {{ knowledgeGraph.stats.edges }}</span>
+              <span>Legado: {{ knowledgeGraph.stats.legacyAnchors }}</span>
+            </div>
+            <button
+              class="timeline-item"
+              *ngFor="let node of knowledgeGraph.nodes.slice(0, 5)"
+              (click)="openGraphNode(node)"
+            >
+              <div class="timeline-title">{{ node.label }}</div>
+              <div class="timeline-meta">
+                <span>{{ node.type }}</span>
+                <span *ngIf="node.legacyAnchor" class="badge badge-warning">LEGADO</span>
+              </div>
             </button>
           </div>
 
@@ -414,6 +450,56 @@ type EditableWikiBlock = {
         margin-bottom: 0.75rem;
         padding-bottom: 0.75rem;
       }
+      .timeline-box {
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.75rem;
+      }
+      .graph-box {
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.75rem;
+      }
+      .graph-stats {
+        display: grid;
+        gap: 0.25rem;
+        margin-bottom: 0.5rem;
+        color: var(--text-secondary);
+        font-size: 0.76rem;
+      }
+      .timeline-item {
+        width: 100%;
+        text-align: left;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        background: rgba(255, 255, 255, 0.02);
+        padding: 0.55rem;
+        margin-bottom: 0.45rem;
+        color: var(--text-primary);
+        cursor: pointer;
+      }
+      .timeline-item:hover {
+        border-color: var(--accent-primary);
+      }
+      .timeline-title {
+        font-size: 0.84rem;
+        font-weight: 600;
+      }
+      .timeline-meta {
+        margin-top: 0.25rem;
+        display: flex;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+        align-items: center;
+        color: var(--text-muted);
+        font-size: 0.73rem;
+      }
+      .timeline-summary {
+        margin-top: 0.3rem;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        line-height: 1.25;
+      }
       .wiki-list-item {
         width: 100%;
         text-align: left;
@@ -614,6 +700,8 @@ export class CampaignWikiComponent implements OnInit {
   tree: WikiTreeNode[] = [];
   flatTreeNodes: FlatTreeNode[] = [];
   favorites: WikiFavorite[] = [];
+  timeline: WikiTimelineEntry[] = [];
+  knowledgeGraph: CampaignKnowledgeGraph | null = null;
   templates: WikiTemplate[] = [];
   selectedPage: WikiPageView | null = null;
   relations: WikiPageRelations | null = null;
@@ -674,7 +762,8 @@ export class CampaignWikiComponent implements OnInit {
 
   constructor(
     private route: ActivatedRoute,
-    private wikiService: WikiService
+    private wikiService: WikiService,
+    private knowledgeGraphService: KnowledgeGraphService
   ) {}
 
   ngOnInit(): void {
@@ -704,12 +793,16 @@ export class CampaignWikiComponent implements OnInit {
       }),
       tree: this.wikiService.getCampaignTree(this.campaignId),
       favorites: this.wikiService.getFavorites(this.campaignId),
+      timeline: this.wikiService.getCampaignTimeline(this.campaignId, 14),
+      graph: this.knowledgeGraphService.getCampaignGraph(this.campaignId, 120),
     }).subscribe({
-      next: ({ pages, tree, favorites }) => {
+      next: ({ pages, tree, favorites, timeline, graph }) => {
         this.pages = (pages.data || []) as WikiPageView[];
         this.tree = tree.data || [];
         this.flatTreeNodes = this.flattenTree(this.tree);
         this.favorites = favorites.data || [];
+        this.timeline = timeline.data || [];
+        this.knowledgeGraph = graph.data;
         this.loading = false;
       },
       error: () => {
@@ -1053,6 +1146,40 @@ export class CampaignWikiComponent implements OnInit {
 
     const visibleIds = new Set(this.pages.map((page) => page.id));
     return this.flatTreeNodes.filter((node) => visibleIds.has(node.id));
+  }
+
+  openTimelineEntry(entry: WikiTimelineEntry): void {
+    if (entry.kind === 'WIKI_PAGE') {
+      this.openPageById(entry.referenceId);
+      return;
+    }
+
+    this.searchTerm = entry.title;
+    this.legacyMessage = `Timeline: ${this.formatTimelineKind(entry.kind)} carregada no filtro da wiki.`;
+    this.loadPages();
+  }
+
+  openGraphNode(node: CampaignKnowledgeGraph['nodes'][number]): void {
+    if (node.type === 'WIKI_PAGE') {
+      this.openPageById(node.metadata.sourceId);
+      return;
+    }
+
+    this.searchTerm = node.label;
+    this.legacyMessage = `Knowledge Graph: foco em ${node.type} aplicado na busca.`;
+    this.loadPages();
+  }
+
+  formatTimelineKind(kind: WikiTimelineEntry['kind']): string {
+    if (kind === 'WIKI_PAGE') {
+      return 'Wiki';
+    }
+
+    if (kind === 'SESSION') {
+      return 'Sessao';
+    }
+
+    return 'Evento';
   }
 
   onTreeDragStart(nodeId: string): void {

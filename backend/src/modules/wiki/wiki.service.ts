@@ -153,6 +153,19 @@ export interface WikiPageRelations {
   }>;
 }
 
+export interface WikiTimelineEntry {
+  id: string;
+  kind: 'WIKI_PAGE' | 'SESSION' | 'EVENT';
+  campaignId: string;
+  happenedAt: Date;
+  title: string;
+  summary: string;
+  tags: string[];
+  category: WikiCategory | 'SESSION' | 'EVENT';
+  referenceId: string;
+  legacyAnchor: boolean;
+}
+
 export class WikiService {
   private readonly WIKI_LINK_PATTERN = /\[\[([^\]]+)\]\]/g;
   private readonly LEGACY_MENTION_PATTERN = /@([^\n@#.,;:!?()[\]{}]{2,80})/g;
@@ -253,6 +266,18 @@ export class WikiService {
     }
 
     return `${normalized.slice(0, maxLength - 1)}…`;
+  }
+
+  private hasLegacyCanonMarker(value: string | null | undefined): boolean {
+    if (!value) {
+      return false;
+    }
+
+    const normalized = value.toLowerCase();
+    return (
+      normalized.includes('augustus frostborne') ||
+      normalized.includes('satoru naitokira')
+    );
   }
 
   private async listRankedPageIdsByFullText(input: {
@@ -1379,6 +1404,120 @@ export class WikiService {
         },
       },
     });
+  }
+
+  async listCampaignTimeline(campaignId: string, userId: string, limit = 30): Promise<WikiTimelineEntry[]> {
+    const access = await this.getCampaignAccess(campaignId, userId);
+    const safeLimit = Math.min(Math.max(limit, 5), 120);
+    const batchSize = Math.min(safeLimit * 3, 240);
+
+    const [pages, sessions, events] = await Promise.all([
+      prisma.wikiPage.findMany({
+        where: {
+          campaignId: access.campaignId,
+          ...this.getVisibilityFilter(access),
+        },
+        select: {
+          id: true,
+          campaignId: true,
+          title: true,
+          content: true,
+          category: true,
+          tags: true,
+          legacySource: true,
+          updatedAt: true,
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        take: batchSize,
+      }),
+      prisma.session.findMany({
+        where: {
+          campaignId: access.campaignId,
+        },
+        select: {
+          id: true,
+          campaignId: true,
+          date: true,
+          summary: true,
+          narrativeLog: true,
+          highlights: true,
+        },
+        orderBy: {
+          date: 'desc',
+        },
+        take: batchSize,
+      }),
+      prisma.event.findMany({
+        where: {
+          campaignId: access.campaignId,
+        },
+        select: {
+          id: true,
+          campaignId: true,
+          title: true,
+          description: true,
+          eventDate: true,
+          type: true,
+        },
+        orderBy: {
+          eventDate: 'desc',
+        },
+        take: batchSize,
+      }),
+    ]);
+
+    const wikiEntries: WikiTimelineEntry[] = pages.map((page) => ({
+      id: `wiki:${page.id}`,
+      kind: 'WIKI_PAGE',
+      campaignId: page.campaignId,
+      happenedAt: page.updatedAt,
+      title: page.title,
+      summary: this.truncateExcerpt(page.content),
+      tags: page.tags,
+      category: page.category,
+      referenceId: page.id,
+      legacyAnchor: Boolean(page.legacySource) || this.hasLegacyCanonMarker(`${page.title} ${page.content}`),
+    }));
+
+    const sessionEntries: WikiTimelineEntry[] = sessions.map((session) => {
+      const fallbackTitle = `Sessao ${session.date.toISOString().slice(0, 10)}`;
+      const summary =
+        this.truncateExcerpt(session.summary) ||
+        this.truncateExcerpt(session.narrativeLog) ||
+        this.truncateExcerpt(session.highlights.join(' · '));
+
+      return {
+        id: `session:${session.id}`,
+        kind: 'SESSION',
+        campaignId: session.campaignId,
+        happenedAt: session.date,
+        title: session.summary?.trim().length ? session.summary : fallbackTitle,
+        summary,
+        tags: ['session', ...session.highlights.slice(0, 3).map((entry) => entry.trim()).filter((entry) => entry.length > 0)],
+        category: 'SESSION',
+        referenceId: session.id,
+        legacyAnchor: this.hasLegacyCanonMarker(`${session.summary ?? ''} ${session.narrativeLog ?? ''}`),
+      };
+    });
+
+    const eventEntries: WikiTimelineEntry[] = events.map((event) => ({
+      id: `event:${event.id}`,
+      kind: 'EVENT',
+      campaignId: event.campaignId,
+      happenedAt: event.eventDate,
+      title: event.title,
+      summary: this.truncateExcerpt(event.description),
+      tags: ['event', event.type.toLowerCase()],
+      category: 'EVENT',
+      referenceId: event.id,
+      legacyAnchor: this.hasLegacyCanonMarker(`${event.title} ${event.description ?? ''}`),
+    }));
+
+    return [...wikiEntries, ...sessionEntries, ...eventEntries]
+      .sort((a, b) => b.happenedAt.getTime() - a.happenedAt.getTime())
+      .slice(0, safeLimit);
   }
 
   async searchMentions(campaignId: string, userId: string, query: string, limit = 8) {

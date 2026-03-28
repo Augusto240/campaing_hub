@@ -9,6 +9,7 @@ import {
   deleteWikiPage,
   getCampaignWikiFavorites,
   getCampaignWikiPages,
+  getCampaignWikiTimeline,
   getCampaignWikiTree,
   getWikiMentionSuggestions,
   getWikiPageById,
@@ -30,6 +31,7 @@ router.post('/campaign/:campaignId/bootstrap-legacy', canManageCampaign, bootstr
 router.post('/campaign/:campaignId/from-template', isCampaignMember, createWikiFromTemplate);
 router.get('/campaign/:campaignId', isCampaignMember, getCampaignWikiPages);
 router.get('/campaign/:campaignId/tree', isCampaignMember, getCampaignWikiTree);
+router.get('/campaign/:campaignId/timeline', isCampaignMember, getCampaignWikiTimeline);
 router.post('/campaign/:campaignId/seed-legacy', isCampaignMember, seedLegacyWikiContent);
 router.get('/campaign/:campaignId/favorites', isCampaignMember, getCampaignWikiFavorites);
 router.get('/campaign/:campaignId/mentions', isCampaignMember, getWikiMentionSuggestions);

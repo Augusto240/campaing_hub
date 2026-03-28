@@ -36,6 +36,10 @@ export const wikiMentionsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(20).optional().default(8),
 });
 
+export const wikiTimelineQuerySchema = z.object({
+  limit: z.coerce.number().int().min(5).max(120).optional().default(30),
+});
+
 export const createWikiFromTemplateSchema = z.object({
   title: z.string().trim().min(1).max(200),
   templateKey: z.enum(['CHARACTER_DOSSIER', 'LOCATION_ATLAS', 'SESSION_CHRONICLE']),

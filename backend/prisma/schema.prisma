@@ -78,6 +78,23 @@ enum ProposalStatus {
   CANCELLED
 }
 
+enum GraphNodeType {
+  WIKI_PAGE
+  CHARACTER
+  SESSION
+  ITEM
+  CREATURE
+  COMPENDIUM_ENTRY
+}
+
+enum GraphEdgeType {
+  WIKI_LINK
+  WIKI_MENTION
+  SESSION_COMBATANT
+  CHARACTER_ITEM
+  COMPENDIUM_REFERENCE
+}
+
 model User {
   id           String   @id @default(uuid())
   name         String
@@ -161,6 +178,8 @@ model Campaign {
   wikiPages      WikiPage[]
   diceRolls      DiceRoll[]
   sessionProposals SessionProposal[]
+  knowledgeNodes KnowledgeNode[]
+  knowledgeEdges KnowledgeEdge[]
 
   @@map("campaigns")
 }
@@ -526,4 +545,44 @@ model SessionVote {
 
   @@unique([proposalId, userId, date])
   @@map("session_votes")
+}
+
+model KnowledgeNode {
+  id          String        @id @default(uuid())
+  campaignId  String        @map("campaign_id")
+  nodeType    GraphNodeType @map("node_type")
+  sourceId    String        @map("source_id")
+  label       String
+  legacyAnchor Boolean      @default(false) @map("legacy_anchor")
+  metadata    Json          @default("{}")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  outgoingEdges KnowledgeEdge[] @relation("KnowledgeEdgeSource")
+  incomingEdges KnowledgeEdge[] @relation("KnowledgeEdgeTarget")
+
+  @@unique([campaignId, nodeType, sourceId])
+  @@index([campaignId, nodeType])
+  @@map("knowledge_nodes")
+}
+
+model KnowledgeEdge {
+  id          String        @id @default(uuid())
+  campaignId  String        @map("campaign_id")
+  edgeType    GraphEdgeType @map("edge_type")
+  sourceNodeId String       @map("source_node_id")
+  targetNodeId String       @map("target_node_id")
+  weight      Float         @default(1)
+  metadata    Json          @default("{}")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sourceNode KnowledgeNode @relation("KnowledgeEdgeSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode KnowledgeNode @relation("KnowledgeEdgeTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, edgeType])
+  @@unique([campaignId, edgeType, sourceNodeId, targetNodeId])
+  @@map("knowledge_edges")
 }

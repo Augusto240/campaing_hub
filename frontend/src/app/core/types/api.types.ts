@@ -389,6 +389,21 @@ export interface WikiMentionSuggestion {
   category: WikiCategory;
 }
 
+export type WikiTimelineEntryKind = 'WIKI_PAGE' | 'SESSION' | 'EVENT';
+
+export interface WikiTimelineEntry {
+  id: string;
+  kind: WikiTimelineEntryKind;
+  campaignId: string;
+  happenedAt: string;
+  title: string;
+  summary: string;
+  tags: string[];
+  category: WikiCategory | 'SESSION' | 'EVENT';
+  referenceId: string;
+  legacyAnchor: boolean;
+}
+
 export type CompendiumKind = 'BESTIARY' | 'SPELL' | 'ITEM' | 'CLASS';
 
 export interface CompendiumLinkedCharacter {
@@ -417,6 +432,58 @@ export interface CampaignCompendiumResponse {
   systemSlug: string;
   totals: Record<CompendiumKind, number>;
   entries: CompendiumEntry[];
+}
+
+export type KnowledgeGraphNodeType =
+  | 'WIKI_PAGE'
+  | 'CHARACTER'
+  | 'SESSION'
+  | 'ITEM'
+  | 'CREATURE'
+  | 'COMPENDIUM_ENTRY';
+
+export type KnowledgeGraphEdgeType =
+  | 'WIKI_LINK'
+  | 'WIKI_MENTION'
+  | 'SESSION_COMBATANT'
+  | 'CHARACTER_ITEM'
+  | 'COMPENDIUM_REFERENCE';
+
+export interface KnowledgeGraphNode {
+  id: string;
+  type: KnowledgeGraphNodeType;
+  label: string;
+  legacyAnchor: boolean;
+  metadata: {
+    campaignId: string;
+    sourceId: string;
+    category?: string;
+    tags?: string[];
+    updatedAt?: string;
+  };
+}
+
+export interface KnowledgeGraphEdge {
+  id: string;
+  type: KnowledgeGraphEdgeType;
+  source: string;
+  target: string;
+  weight: number;
+  metadata: {
+    reason: string;
+  };
+}
+
+export interface CampaignKnowledgeGraph {
+  campaignId: string;
+  generatedAt: string;
+  stats: {
+    nodes: number;
+    edges: number;
+    legacyAnchors: number;
+  };
+  nodes: KnowledgeGraphNode[];
+  edges: KnowledgeGraphEdge[];
 }
 
 // ============================================================================

@@ -6,6 +6,7 @@ Plataforma full-stack para gerenciamento de campanhas de RPG com foco em operaca
 
 Campaign Hub integra:
 - Wiki viva hierarquica com editor de blocos e busca Full-Text PostgreSQL.
+- Knowledge Graph da campanha com nos/arestas entre wiki, personagens, sessoes, itens e compendio.
 - Sistema de conhecimento estilo Notion (templates, favoritos, backlinks, drag-and-drop de arvore).
 - Mesa virtual (VTT MVP) com grid, tokens, chat, rolagens em tempo real, Fog of War e iluminacao dinamica.
 - Compendio interno multi-sistema (D&D 5e, CoC 7e, Tormenta20) com filtros e vinculos com campanha/personagens/sessoes.
@@ -33,6 +34,7 @@ Projeto legado (2023) preservado: personagens fundadores Augustus Frostborne e S
   - features/campaign/campaign-compendium: bestiario + regras (magias/itens/classes)
 - backend/ (Express)
   - modules/wiki: wiki, blocos, favoritos, templates, legado, FTS, backlinks
+  - modules/knowledge-graph: agregacao de nos/arestas entre entidades da campanha
   - modules/compendium: compendio unificado por campanha/sistema
   - modules/creatures/combat/sessions/characters: dominio RPG
   - config/socket: sincronizacao realtime por campanha
@@ -45,6 +47,8 @@ Concluido no MVP avancado:
 - [x] Wiki pagina-subpagina (hierarquia)
 - [x] Editor de blocos (texto, checklist, quote, callout, code, image, table)
 - [x] Backlinks wiki->wiki e wiki->entidades (character/session/item/creature)
+- [x] Timeline viva da campanha (wiki, sessoes e eventos)
+- [x] Grafo de conhecimento unificado (wiki + sessao + personagem + item + compendio)
 - [x] Full-Text Search PostgreSQL com ranking (to_tsvector + websearch_to_tsquery + GIN)
 - [x] Seed de legado com Augustus e Satoru como entidades fundadoras
 
@@ -83,9 +87,13 @@ Concluido:
 ### Wiki
 - GET /api/wiki/campaign/:campaignId
 - GET /api/wiki/campaign/:campaignId/tree
+- GET /api/wiki/campaign/:campaignId/timeline?limit=30
 - GET /api/wiki/:wikiPageId/relations
 - PUT /api/wiki/:wikiPageId/blocks
 - POST /api/wiki/campaign/:campaignId/bootstrap-legacy
+
+### Knowledge Graph
+- GET /api/knowledge-graph/campaign/:campaignId?limit=140
 
 ### Compendium
 - GET /api/compendium/campaign/:campaignId?kind=bestiary|spell|item|class&search=...
@@ -108,6 +116,7 @@ Migrations importantes recentes:
 - phase8_wiki_hierarchy
 - phase9_wiki_notion_blocks
 - phase10_wiki_fulltext_search (GIN em wiki_pages)
+- phase11_knowledge_graph_core
 
 ## Quick Start (Docker)
 
