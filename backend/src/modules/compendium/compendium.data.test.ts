@@ -42,4 +42,32 @@ describe('compendium.data', () => {
     expect(totals.SPELL).toBeGreaterThan(0);
     expect(totals.CLASS).toBeGreaterThan(0);
   });
+
+  it('inclui referencias rapidas de mesa no compendio dnd5e', () => {
+    const entries = filterCompendiumEntries({
+      systemSlug: 'dnd5e',
+      search: 'opportunity attack',
+      limit: 20,
+    });
+
+    expect(entries.some((entry) => entry.name === 'Quick Rule - Opportunity Attack')).toBe(true);
+  });
+
+  it('mantem entradas legado e investigativas prontas para a wiki viva', () => {
+    const legacyEntries = filterCompendiumEntries({
+      systemSlug: 'dnd5e',
+      search: 'frostborne',
+      limit: 20,
+    });
+
+    const utilityEntries = filterCompendiumEntries({
+      systemSlug: 'dnd5e',
+      search: 'detect magic',
+      limit: 20,
+    });
+
+    expect(legacyEntries.some((entry) => entry.name === 'Frostborne Ember Ray')).toBe(true);
+    expect(legacyEntries.some((entry) => entry.name === 'Frostborne Star Compass')).toBe(true);
+    expect(utilityEntries.some((entry) => entry.name === 'Detect Magic')).toBe(true);
+  });
 });

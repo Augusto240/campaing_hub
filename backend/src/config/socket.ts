@@ -2,6 +2,7 @@ import { Server as HttpServer } from 'http';
 import { Server as SocketServer, Socket } from 'socket.io';
 import { randomUUID } from 'crypto';
 import { verifyAccessToken } from '../modules/auth/auth.service';
+import { resolveCampaignAccess } from '../modules/campaigns/campaign-access.service';
 import { logger } from './logger';
 import { setSocketServer } from './realtime';
 import {
@@ -18,6 +19,8 @@ type SocketUser = {
   role: string;
 };
 
+type CampaignSocketErrorCode = 'CAMPAIGN_FORBIDDEN' | 'GM_REQUIRED' | 'INVALID_PAYLOAD';
+
 type TabletopUpdatePayload = TabletopStatePatch & {
   campaignId: string;
 };
@@ -26,7 +29,7 @@ type CampaignSocket = Socket<
   Record<string, never>,
   Record<string, never>,
   Record<string, never>,
-  { user: SocketUser; joinedCampaignIds: Set<string> }
+  { user: SocketUser; joinedCampaigns: Map<string, { isGM: boolean }> }
 >;
 
 type VttTokenPayload = {
@@ -75,6 +78,11 @@ type TabletopLightUpsertPayload = {
 type TabletopFogPatchPayload = {
   campaignId: string;
   fog: TabletopStatePatch['fog'];
+};
+
+type CampaignJoinedEvent = {
+  campaignId: string;
+  isGM: boolean;
 };
 
 const asRecord = (value: unknown): Record<string, unknown> | null => {
@@ -191,6 +199,62 @@ const parseChatIncomingEvent = (value: unknown): VttChatIncomingEvent | null => 
 const campaignPresence = new Map<string, Map<string, number>>();
 const tabletopStateByCampaign = new Map<string, CampaignTabletopState>();
 
+const emitCampaignSocketError = (
+  socket: Socket,
+  payload: { campaignId?: string; code: CampaignSocketErrorCode; message: string }
+): void => {
+  socket.emit('campaign:error', payload);
+};
+
+const emitCampaignJoined = (
+  socket: Socket,
+  payload: CampaignJoinedEvent
+): void => {
+  socket.emit('campaign:joined', payload);
+};
+
+const requireCampaignAccess = (
+  socket: CampaignSocket,
+  campaignIdRaw: unknown,
+  options?: {
+    requireGM?: boolean;
+    invalidMessage?: string;
+  }
+): { campaignId: string; access: { isGM: boolean } } | null => {
+  const campaignId = asString(campaignIdRaw);
+  if (!campaignId) {
+    emitCampaignSocketError(socket, {
+      code: 'INVALID_PAYLOAD',
+      message: options?.invalidMessage ?? 'Campaign payload is invalid',
+    });
+    return null;
+  }
+
+  const access = socket.data.joinedCampaigns.get(campaignId);
+  if (!access) {
+    emitCampaignSocketError(socket, {
+      campaignId,
+      code: 'CAMPAIGN_FORBIDDEN',
+      message: 'You are not allowed to access this campaign',
+    });
+    return null;
+  }
+
+  if (options?.requireGM && !access.isGM) {
+    emitCampaignSocketError(socket, {
+      campaignId,
+      code: 'GM_REQUIRED',
+      message: 'Only the GM can mutate the tabletop state',
+    });
+    return null;
+  }
+
+  return {
+    campaignId,
+    access,
+  };
+};
+
 const getOrCreateTabletopState = (campaignId: string, userId: string): CampaignTabletopState => {
   const existing = tabletopStateByCampaign.get(campaignId);
   if (existing) {
@@ -269,7 +333,7 @@ export function setupSocket(httpServer: HttpServer): SocketServer {
       const user = await verifyAccessToken(token);
 
       (socket as CampaignSocket).data.user = user;
-      (socket as CampaignSocket).data.joinedCampaignIds = new Set();
+      (socket as CampaignSocket).data.joinedCampaigns = new Map();
       next();
     } catch {
       next(new Error('Unauthorized'));
@@ -280,56 +344,109 @@ export function setupSocket(httpServer: HttpServer): SocketServer {
     const typedSocket = socket as CampaignSocket;
     logger.info({ userId: typedSocket.data.user.id }, '[socket] user connected');
 
-    typedSocket.on('campaign:join', (campaignId: string) => {
-      typedSocket.join(`campaign:${campaignId}`);
-      typedSocket.data.joinedCampaignIds.add(campaignId);
-      joinPresence(campaignId, typedSocket.data.user.id);
-      emitPresenceUpdate(io, campaignId);
-      logger.info({ userId: typedSocket.data.user.id, campaignId }, '[socket] joined campaign room');
+    typedSocket.on('campaign:join', async (campaignIdRaw: string) => {
+      const campaignId = asString(campaignIdRaw);
+      if (!campaignId) {
+        emitCampaignSocketError(typedSocket, {
+          code: 'INVALID_PAYLOAD',
+          message: 'Campaign ID is required',
+        });
+        return;
+      }
+
+      try {
+        const access = await resolveCampaignAccess(campaignId, typedSocket.data.user.id);
+        if (!access) {
+          logger.warn(
+            { userId: typedSocket.data.user.id, campaignId },
+            '[socket] denied campaign room join'
+          );
+          emitCampaignSocketError(typedSocket, {
+            campaignId,
+            code: 'CAMPAIGN_FORBIDDEN',
+            message: 'You are not allowed to access this campaign',
+          });
+          return;
+        }
+
+        const alreadyJoined = typedSocket.data.joinedCampaigns.has(campaignId);
+        typedSocket.join(`campaign:${campaignId}`);
+        typedSocket.data.joinedCampaigns.set(campaignId, { isGM: access.isGM });
+        if (!alreadyJoined) {
+          joinPresence(campaignId, typedSocket.data.user.id);
+        }
+        emitPresenceUpdate(io, campaignId);
+        emitCampaignJoined(typedSocket, {
+          campaignId,
+          isGM: access.isGM,
+        });
+        logger.info({ userId: typedSocket.data.user.id, campaignId }, '[socket] joined campaign room');
+      } catch (err) {
+        logger.error({ err, userId: typedSocket.data.user.id, campaignId }, '[socket] join failed');
+        emitCampaignSocketError(typedSocket, {
+          campaignId,
+          code: 'CAMPAIGN_FORBIDDEN',
+          message: 'Unable to join campaign room',
+        });
+      }
     });
 
-    typedSocket.on('campaign:leave', (campaignId: string) => {
+    typedSocket.on('campaign:leave', (campaignIdRaw: string) => {
+      const campaignId = asString(campaignIdRaw);
+      if (!campaignId) {
+        return;
+      }
+
       typedSocket.leave(`campaign:${campaignId}`);
 
-      if (typedSocket.data.joinedCampaignIds.has(campaignId)) {
-        typedSocket.data.joinedCampaignIds.delete(campaignId);
+      if (typedSocket.data.joinedCampaigns.has(campaignId)) {
+        typedSocket.data.joinedCampaigns.delete(campaignId);
         leavePresence(campaignId, typedSocket.data.user.id);
         emitPresenceUpdate(io, campaignId);
       }
     });
 
-    typedSocket.on('campaign:tabletop:request', (campaignId: string) => {
-      if (!typedSocket.data.joinedCampaignIds.has(campaignId)) {
+    typedSocket.on('campaign:tabletop:request', (campaignIdRaw: string) => {
+      const campaign = requireCampaignAccess(typedSocket, campaignIdRaw, {
+        invalidMessage: 'Campaign ID is required to request tabletop state',
+      });
+      if (!campaign) {
         return;
       }
 
-      const state = getOrCreateTabletopState(campaignId, typedSocket.data.user.id);
+      const state = getOrCreateTabletopState(campaign.campaignId, typedSocket.data.user.id);
       (typedSocket as unknown as Socket).emit('campaign:tabletop:state', {
-        campaignId,
+        campaignId: campaign.campaignId,
         state,
       });
     });
 
     typedSocket.on('campaign:tabletop:update', (payload: TabletopUpdatePayload) => {
-      const campaignId = String(payload?.campaignId || '');
-      if (!campaignId || !typedSocket.data.joinedCampaignIds.has(campaignId)) {
+      const campaign = requireCampaignAccess(typedSocket, payload?.campaignId, {
+        requireGM: true,
+        invalidMessage: 'Campaign ID is required to update the tabletop state',
+      });
+      if (!campaign) {
         return;
       }
 
-      const currentState = getOrCreateTabletopState(campaignId, typedSocket.data.user.id);
+      const currentState = getOrCreateTabletopState(campaign.campaignId, typedSocket.data.user.id);
       const nextState = buildNextTabletopState(currentState, payload, typedSocket.data.user.id);
 
-      tabletopStateByCampaign.set(campaignId, nextState);
-      emitTabletopState(io, campaignId);
+      tabletopStateByCampaign.set(campaign.campaignId, nextState);
+      emitTabletopState(io, campaign.campaignId);
     });
 
     typedSocket.on('campaign:tabletop:fog', (payload: TabletopFogPatchPayload) => {
-      const campaignId = String(payload?.campaignId || '');
-      if (!campaignId || !typedSocket.data.joinedCampaignIds.has(campaignId)) {
+      const campaign = requireCampaignAccess(typedSocket, payload?.campaignId, {
+        requireGM: true,
+        invalidMessage: 'Campaign ID is required to update fog of war',
+      });
+      if (!campaign) {
         return;
       }
 
-      const currentState = getOrCreateTabletopState(campaignId, typedSocket.data.user.id);
+      const currentState = getOrCreateTabletopState(campaign.campaignId, typedSocket.data.user.id);
       const nextState = buildNextTabletopState(
         currentState,
         {
@@ -338,19 +455,28 @@ export function setupSocket(httpServer: HttpServer): SocketServer {
         typedSocket.data.user.id
       );
 
-      tabletopStateByCampaign.set(campaignId, nextState);
-      emitTabletopState(io, campaignId);
+      tabletopStateByCampaign.set(campaign.campaignId, nextState);
+      emitTabletopState(io, campaign.campaignId);
     });
 
     typedSocket.on('campaign:tabletop:light:upsert', (payload: TabletopLightUpsertPayload) => {
-      const campaignId = String(payload?.campaignId || '');
-      const lightId = String(payload?.light?.id || '');
-
-      if (!campaignId || !lightId || !typedSocket.data.joinedCampaignIds.has(campaignId)) {
+      const campaign = requireCampaignAccess(typedSocket, payload?.campaignId, {
+        requireGM: true,
+        invalidMessage: 'Campaign ID is required to update a light source',
+      });
+      const lightId = asString(payload?.light?.id);
+      if (!campaign || !lightId) {
+        if (campaign && !lightId) {
+          emitCampaignSocketError(typedSocket, {
+            campaignId: campaign.campaignId,
+            code: 'INVALID_PAYLOAD',
+            message: 'Light source payload is invalid',
+          });
+        }
         return;
       }
 
-      const currentState = getOrCreateTabletopState(campaignId, typedSocket.data.user.id);
+      const currentState = getOrCreateTabletopState(campaign.campaignId, typedSocket.data.user.id);
       const hasLight = currentState.lights.some((light) => light.id === lightId);
       const lights = hasLight
         ? currentState.lights.map((light) => (light.id === lightId ? payload.light : light))
@@ -364,19 +490,28 @@ export function setupSocket(httpServer: HttpServer): SocketServer {
         typedSocket.data.user.id
       );
 
-      tabletopStateByCampaign.set(campaignId, nextState);
-      emitTabletopState(io, campaignId);
+      tabletopStateByCampaign.set(campaign.campaignId, nextState);
+      emitTabletopState(io, campaign.campaignId);
     });
 
     typedSocket.on('campaign:tabletop:light:remove', (payload: { campaignId: string; lightId: string }) => {
-      const campaignId = String(payload?.campaignId || '');
-      const lightId = String(payload?.lightId || '');
-
-      if (!campaignId || !lightId || !typedSocket.data.joinedCampaignIds.has(campaignId)) {
+      const campaign = requireCampaignAccess(typedSocket, payload?.campaignId, {
+        requireGM: true,
+        invalidMessage: 'Campaign ID is required to remove a light source',
+      });
+      const lightId = asString(payload?.lightId);
+      if (!campaign || !lightId) {
+        if (campaign && !lightId) {
+          emitCampaignSocketError(typedSocket, {
+            campaignId: campaign.campaignId,
+            code: 'INVALID_PAYLOAD',
+            message: 'Light removal payload is invalid',
+          });
+        }
         return;
       }
 
-      const currentState = getOrCreateTabletopState(campaignId, typedSocket.data.user.id);
+      const currentState = getOrCreateTabletopState(campaign.campaignId, typedSocket.data.user.id);
       const nextState = buildNextTabletopState(
         currentState,
         {
@@ -385,14 +520,24 @@ export function setupSocket(httpServer: HttpServer): SocketServer {
         typedSocket.data.user.id
       );
 
-      tabletopStateByCampaign.set(campaignId, nextState);
-      emitTabletopState(io, campaignId);
+      tabletopStateByCampaign.set(campaign.campaignId, nextState);
+      emitTabletopState(io, campaign.campaignId);
     });
 
     typedSocket.on('vtt:token:upsert', (payload: unknown) => {
       const parsed = parseTokenUpsertEvent(payload);
+      if (!parsed) {
+        emitCampaignSocketError(typedSocket, {
+          code: 'INVALID_PAYLOAD',
+          message: 'Token payload is invalid',
+        });
+        return;
+      }
 
-      if (!parsed || !typedSocket.data.joinedCampaignIds.has(parsed.campaignId)) {
+      const campaign = requireCampaignAccess(typedSocket, parsed.campaignId, {
+        requireGM: true,
+      });
+      if (!campaign) {
         return;
       }
 
@@ -401,13 +546,21 @@ export function setupSocket(httpServer: HttpServer): SocketServer {
 
     typedSocket.on('vtt:chat:message', (payload: unknown) => {
       const parsed = parseChatIncomingEvent(payload);
+      if (!parsed) {
+        emitCampaignSocketError(typedSocket, {
+          code: 'INVALID_PAYLOAD',
+          message: 'Chat payload is invalid',
+        });
+        return;
+      }
 
-      if (!parsed || !typedSocket.data.joinedCampaignIds.has(parsed.campaignId)) {
+      const campaign = requireCampaignAccess(typedSocket, parsed.campaignId);
+      if (!campaign) {
         return;
       }
 
       const outgoing: VttChatOutgoingEvent = {
-        campaignId: parsed.campaignId,
+        campaignId: campaign.campaignId,
         message: {
           id: randomUUID(),
           authorId: typedSocket.data.user.id,
@@ -418,11 +571,11 @@ export function setupSocket(httpServer: HttpServer): SocketServer {
         },
       };
 
-      io.to(`campaign:${parsed.campaignId}`).emit('vtt:chat:message', outgoing);
+      io.to(`campaign:${campaign.campaignId}`).emit('vtt:chat:message', outgoing);
     });
 
     typedSocket.on('disconnect', () => {
-      typedSocket.data.joinedCampaignIds.forEach((campaignId) => {
+      typedSocket.data.joinedCampaigns.forEach((_access, campaignId) => {
         leavePresence(campaignId, typedSocket.data.user.id);
         emitPresenceUpdate(io, campaignId);
       });

@@ -9,6 +9,10 @@ import { CreatureService } from '../../../core/services/creature.service';
 import { SessionService } from '../../../core/services/session.service';
 import { SystemBadgeComponent } from '../../../shared/components/system-badge.component';
 import { CompendiumEntry, CompendiumKind } from '../../../core/types';
+import {
+  getKnowledgePresenceScore,
+  sortKnowledgeEntriesByPresence,
+} from './campaign-compendium.utils';
 
 type CampaignView = {
   id: string;
@@ -65,7 +69,8 @@ const COMPENDIUM_TABS: Array<{ label: string; kind: CompendiumKind }> = [
       <header class="header card">
         <div>
           <a class="back" [routerLink]="['/campaigns', campaign.id]">Voltar</a>
-          <h1>Compendio de Criaturas</h1>
+          <h1>Compendio da Campanha</h1>
+          <p class="header-copy">Magias, itens, classes e memoria de mesa conectados a sessoes, wiki e personagens.</p>
           <app-system-badge [system]="campaign.systemTemplate?.slug || 'generic'"></app-system-badge>
         </div>
       </header>
@@ -94,6 +99,11 @@ const COMPENDIUM_TABS: Array<{ label: string; kind: CompendiumKind }> = [
           <input type="range" [(ngModel)]="xpMin" min="0" max="10000" step="100" (change)="filterCreatures()" />
           <input type="range" [(ngModel)]="xpMax" min="0" max="10000" step="100" (change)="filterCreatures()" />
         </div>
+      </div>
+
+      <div class="results-summary">
+        {{ getActiveResultCount() }} resultados
+        <span *ngIf="activeKind !== 'BESTIARY'">· Entradas mais conectadas sobem primeiro</span>
       </div>
 
       <!-- Painel de Adicionar ao Combate -->
@@ -166,6 +176,18 @@ const COMPENDIUM_TABS: Array<{ label: string; kind: CompendiumKind }> = [
           <div class="creature-type">{{ activeKind }}</div>
           <p class="description">{{ entry.summary }}</p>
 
+          <div class="signal-row" *ngIf="getKnowledgePresenceScore(entry) > 0">
+            <span class="signal-chip" *ngIf="entry.links.usedInSessions.length > 0">
+              {{ entry.links.usedInSessions.length }} sessoes
+            </span>
+            <span class="signal-chip" *ngIf="entry.links.linkedCharacters.length > 0">
+              {{ entry.links.linkedCharacters.length }} personagens
+            </span>
+            <span class="signal-chip" *ngIf="entry.links.referencedInWiki.length > 0">
+              {{ entry.links.referencedInWiki.length }} paginas wiki
+            </span>
+          </div>
+
           <div class="loot-items">
             <span class="loot-item" *ngFor="let tag of entry.tags">{{ tag }}</span>
           </div>
@@ -213,8 +235,10 @@ const COMPENDIUM_TABS: Array<{ label: string; kind: CompendiumKind }> = [
       .shell { width: min(1200px, calc(100% - 2rem)); margin: 0 auto; padding: 1.5rem 0 3rem; }
       .header { padding: 1.2rem; margin-bottom: 1rem; }
       .header h1 { margin: 0.5rem 0; }
+      .header-copy { margin: 0 0 0.75rem; color: var(--text-secondary); max-width: 48rem; }
       .back { color: var(--text-secondary); text-decoration: none; }
-      .filters { padding: 1rem; margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+      .filters { padding: 1rem; margin-bottom: 0.75rem; display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+      .results-summary { margin: 0 0 1rem; color: var(--text-secondary); font-size: 0.85rem; }
       .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; padding: 0.75rem; flex-wrap: wrap; }
       .tab { border: 1px solid var(--border-color); background: rgba(255,255,255,0.03); color: var(--text-secondary); padding: 0.45rem 0.7rem; border-radius: 999px; cursor: pointer; }
       .tab.active { border-color: rgba(201,168,76,0.6); color: var(--text-primary); }
@@ -227,13 +251,15 @@ const COMPENDIUM_TABS: Array<{ label: string; kind: CompendiumKind }> = [
       .form-row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
       .form-row .sm { width: 60px; }
       .creatures-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; }
-      .creature-card { padding: 1rem; cursor: pointer; transition: border-color 0.2s; }
-      .creature-card:hover { border-color: rgba(201, 168, 76, 0.5); }
+      .creature-card { padding: 1rem; cursor: pointer; transition: border-color 0.2s, transform 0.2s ease, box-shadow 0.2s ease; }
+      .creature-card:hover { border-color: rgba(201, 168, 76, 0.5); transform: translateY(-2px); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24); }
       .creature-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
       .creature-header h3 { margin: 0; font-size: 1.1rem; }
       .xp-badge { padding: 0.2rem 0.5rem; border-radius: 999px; background: rgba(201, 168, 76, 0.2); font-size: 0.8rem; color: var(--color-primary); }
       .creature-type { font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
       .description { font-size: 0.9rem; color: var(--text-secondary); margin: 0.5rem 0; }
+      .signal-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0; }
+      .signal-chip { padding: 0.25rem 0.6rem; border-radius: 999px; background: rgba(201, 168, 76, 0.12); border: 1px solid rgba(201, 168, 76, 0.28); color: var(--color-primary); font-size: 0.78rem; }
       .stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.3rem; margin: 0.75rem 0; }
       .stat { text-align: center; padding: 0.3rem; background: rgba(255, 255, 255, 0.03); border-radius: 0.5rem; }
       .stat-label { display: block; font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; }
@@ -453,7 +479,7 @@ export class CampaignCompendiumComponent implements OnInit {
       })
       .subscribe({
         next: (res) => {
-          this.knowledgeEntries = res.data.entries || [];
+          this.knowledgeEntries = sortKnowledgeEntriesByPresence(res.data.entries || []);
           this.kindTotals = res.data.totals;
         },
       });
@@ -475,5 +501,15 @@ export class CampaignCompendiumComponent implements OnInit {
           this.kindTotals = res.data.totals;
         },
       });
+  }
+
+  getKnowledgePresenceScore(entry: CompendiumEntry): number {
+    return getKnowledgePresenceScore(entry);
+  }
+
+  getActiveResultCount(): number {
+    return this.activeKind === 'BESTIARY'
+      ? this.filteredCreatures.length
+      : this.knowledgeEntries.length;
   }
 }

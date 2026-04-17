@@ -4,9 +4,9 @@ services:
     container_name: campaign-hub-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: campaign_user
-      POSTGRES_PASSWORD: campaign_pass
-      POSTGRES_DB: campaign_hub
+      POSTGRES_USER: ${POSTGRES_USER:-campaign_hub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-local-env}
+      POSTGRES_DB: ${POSTGRES_DB:-campaign_hub}
     ports:
       - "5433:5432"
     volumes:
@@ -14,7 +14,7 @@ services:
     networks:
       - campaign-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U campaign_user -d campaign_hub"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-campaign_hub} -d ${POSTGRES_DB:-campaign_hub}"]
       interval: 3s
       timeout: 5s
       retries: 10
@@ -46,10 +46,10 @@ services:
       - ./backend/.env
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://campaign_user:campaign_pass@postgres:5432/campaign_hub
+      DATABASE_URL: postgresql://${POSTGRES_USER:-campaign_hub}:${POSTGRES_PASSWORD:-change-me-in-local-env}@postgres:5432/${POSTGRES_DB:-campaign_hub}
       REDIS_URL: redis://redis:6379
-      CORS_ORIGIN: http://localhost:8081
-      FRONTEND_URL: http://localhost:8081
+      CORS_ORIGIN: ${FRONTEND_URL:-http://localhost:8081}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8081}
       PORT: 3000
     ports:
       - "3002:3000"
@@ -62,6 +62,12 @@ services:
       - ./backend/uploads:/app/uploads
     networks:
       - campaign-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/health >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   frontend:
     build:
@@ -72,12 +78,19 @@ services:
     ports:
       - "8081:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - campaign-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.54.1
     container_name: campaign-hub-prometheus
     restart: unless-stopped
     volumes:
@@ -85,22 +98,36 @@ services:
     ports:
       - "9091:9090"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - campaign-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:9090/-/healthy >/dev/null 2>&1 || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.1.0
     container_name: campaign-hub-grafana
     restart: unless-stopped
     ports:
       - "3003:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: rpgmaster
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-change-me-in-local-env}
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
     networks:
       - campaign-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/health >/dev/null 2>&1 || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
 
 volumes:
   postgres_data:

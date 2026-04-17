@@ -118,6 +118,8 @@ Concluido:
 
 ### Tabletop realtime (Socket.IO)
 - campaign:join / campaign:leave
+- campaign:joined
+- campaign:error
 - campaign:tabletop:request
 - campaign:tabletop:update
 - campaign:tabletop:fog
@@ -139,6 +141,15 @@ Migrations importantes recentes:
 
 Pre-requisitos:
 - Docker Desktop ativo
+
+Preparar segredos da API:
+```bash
+cp backend/.env.example backend/.env
+```
+
+Preencha ao menos:
+- `JWT_SECRET`
+- `JWT_REFRESH_SECRET`
 
 Subir stack:
 ```bash
@@ -166,6 +177,7 @@ Backend:
 ```bash
 cd backend
 npm install
+cp .env.example .env
 npm run prisma:generate
 npm run dev
 ```
@@ -191,7 +203,7 @@ cd backend
 npm run test:coverage
 ```
 
-Observacao: testes de integracao exigem PostgreSQL acessivel no host configurado.
+Observacao: `npm test` e `npm run test:coverage` sobem um PostgreSQL efemero via Docker para validar integracao de forma reproduzivel.
 
 ## Seguranca e operacao
 

@@ -1,111 +1,163 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { AppIconComponent, AppIconName } from '../../shared/components/icon.component';
+
+type FeatureCard = {
+  icon: AppIconName;
+  title: string;
+  desc: string;
+};
+
+type SystemCard = {
+  key: string;
+  icon: AppIconName;
+  name: string;
+  desc: string;
+};
+
+type DiceCard = {
+  sides: number;
+  icon: AppIconName;
+  label: string;
+  result: number;
+};
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, AppIconComponent],
   template: `
     <div class="home">
-      <!-- Hero Section -->
       <section class="hero">
         <div class="hero-bg">
           <div class="particles">
-            <span *ngFor="let p of particles" class="particle" [style.left.%]="p.x" [style.animationDelay.s]="p.delay" [style.animationDuration.s]="p.dur"></span>
+            <span
+              *ngFor="let particle of particles"
+              class="particle"
+              [style.left.%]="particle.x"
+              [style.animationDelay.s]="particle.delay"
+              [style.animationDuration.s]="particle.dur"
+            ></span>
           </div>
           <div class="hero-overlay"></div>
         </div>
+
         <div class="hero-content">
-          <div class="hero-badge">⚔️ Plataforma de RPG</div>
-          <h1>Campaign<span class="accent">Hub</span></h1>
-          <p class="hero-tagline">Gerencie suas campanhas, personagens e sessões de RPG em um único lugar.</p>
-          <p class="hero-sub">De D&D 5e a Tormenta 20, Call of Cthulhu e Pathfinder — tudo unificado.</p>
+          <div class="hero-badge">
+            <app-icon name="shield" [size]="16"></app-icon>
+            Plataforma de RPG
+          </div>
+          <h1>Campaign <span class="accent">Hub</span></h1>
+          <p class="hero-tagline">
+            Campanhas, compêndio, wiki, VTT e memória narrativa em uma única ferramenta.
+          </p>
+          <p class="hero-sub">
+            Dark fantasy autoral com legado de 2023, pronto para demo e pronto para mestrar sem quatro abas abertas.
+          </p>
           <div class="hero-actions">
-            <a routerLink="/auth/register" class="btn btn-primary btn-lg">Começar Agora</a>
+            <a routerLink="/auth/register" class="btn btn-primary btn-lg">Começar agora</a>
             <a routerLink="/auth/login" class="btn btn-outline btn-lg">Já tenho conta</a>
           </div>
-          <div class="hero-scroll-hint" (click)="scrollTo('features')">
+          <button class="hero-scroll-hint" type="button" (click)="scrollTo('features')">
             <span>Explorar</span>
-            <div class="scroll-arrow">↓</div>
-          </div>
+            <app-icon name="chevron-down" [size]="18"></app-icon>
+          </button>
         </div>
       </section>
 
-      <!-- Features Section -->
       <section class="features" id="features">
         <div class="section-container">
           <div class="section-header">
-            <h2>O que você pode fazer</h2>
-            <p>Tudo que um mestre ou jogador de RPG precisa</p>
+            <h2>Por que mestrar aqui</h2>
+            <p>Porque a campanha lembra de tudo: mapa, sessão, compêndio, rolagens e lore.</p>
           </div>
+
           <div class="features-grid">
-            <div class="feature-card" *ngFor="let f of features">
-              <div class="feature-icon">{{ f.icon }}</div>
-              <h3>{{ f.title }}</h3>
-              <p>{{ f.desc }}</p>
-            </div>
+            <article class="feature-card" *ngFor="let feature of features">
+              <div class="feature-icon">
+                <app-icon [name]="feature.icon" [size]="26"></app-icon>
+              </div>
+              <h3>{{ feature.title }}</h3>
+              <p>{{ feature.desc }}</p>
+            </article>
           </div>
         </div>
       </section>
 
-      <!-- Systems Section -->
       <section class="systems">
         <div class="section-container">
           <div class="section-header">
-            <h2>Sistemas Suportados</h2>
-            <p>Cada sistema com sua própria identidade visual</p>
+            <h2>Sistemas suportados</h2>
+            <p>Identidade visual forte, compêndio útil e navegação limpa para cada estilo de mesa.</p>
           </div>
+
           <div class="systems-grid">
-            <div *ngFor="let sys of systems" class="system-card" [attr.data-system]="sys.key">
-              <div class="system-icon">{{ sys.icon }}</div>
-              <h3>{{ sys.name }}</h3>
-              <p>{{ sys.desc }}</p>
+            <article *ngFor="let system of systems" class="system-card" [attr.data-system]="system.key">
+              <div class="system-icon">
+                <app-icon [name]="system.icon" [size]="30"></app-icon>
+              </div>
+              <h3>{{ system.name }}</h3>
+              <p>{{ system.desc }}</p>
               <div class="system-accent-line"></div>
-            </div>
+            </article>
           </div>
         </div>
       </section>
 
-      <!-- Dice Section -->
       <section class="dice-section">
         <div class="section-container">
           <div class="dice-inner">
             <div class="dice-text">
-              <h2>🎲 Rolagem de Dados</h2>
-              <p>Role d4, d6, d8, d10, d12, d20 e d100 diretamente no navegador. Perfeito para sessões online ou para gerar atributos com o método 4d6 drop lowest.</p>
-              <a routerLink="/dice" class="btn btn-primary">Experimentar</a>
-            </div>
-            <div class="dice-demo">
-              <div class="demo-dice" *ngFor="let d of diceTypes" (click)="rollDice(d)">
-                <span class="dice-face">{{ d.icon }}</span>
-                <span class="dice-label">{{ d.label }}</span>
-                <span class="dice-result" *ngIf="d.result">{{ d.result }}</span>
+              <div class="section-kicker">
+                <app-icon name="dice" [size]="16"></app-icon>
+                Rolagem imediata
               </div>
+              <h2>Dados, presença e memória na mesma mesa</h2>
+              <p>
+                Role d4 a d100 direto no navegador, registre o impacto na sessão e mantenha o histórico vivo junto da
+                campanha.
+              </p>
+              <a routerLink="/dice" class="btn btn-primary">Experimentar dados</a>
+            </div>
+
+            <div class="dice-demo">
+              <button class="demo-dice" *ngFor="let dice of diceTypes" type="button" (click)="rollDice(dice)">
+                <span class="dice-face">
+                  <app-icon [name]="dice.icon" [size]="22"></app-icon>
+                </span>
+                <span class="dice-label">{{ dice.label }}</span>
+                <span class="dice-result" *ngIf="dice.result">{{ dice.result }}</span>
+              </button>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- About Section -->
       <section class="about">
         <div class="section-container">
           <div class="about-inner">
             <div class="about-text">
-              <h2>Sobre o Projeto</h2>
-              <p>Este projeto nasceu em <strong>2023</strong> como um simples site HTML/CSS de um estudante do primeiro período de Sistemas para Internet no IFRN Campus Parnamirim, apaixonado por RPG.</p>
-              <p>De páginas estáticas sobre campanhas e personagens, evoluiu para uma <strong>aplicação full-stack completa</strong> com Angular 17, Node.js, Express, Prisma, PostgreSQL e Docker.</p>
-              <p>Um sonho de anos que finalmente se tornou realidade — a mega aplicação web de RPG.</p>
+              <h2>De projeto acadêmico a RPG OS vivo</h2>
+              <p>
+                O Campaign Hub nasceu em <strong>2023</strong> como um site de RPG criado no IFRN Campus Parnamirim.
+                Hoje ele reúne Angular 17, Node.js, Prisma, PostgreSQL, Redis e Socket.IO em um fluxo realmente útil de mesa.
+              </p>
+              <p>
+                A estética dark fantasy, o legado de Augustus Frostborne e Satoru Naitokira e a ideia de memória viva
+                continuam no centro da experiência.
+              </p>
               <div class="about-tech">
-                <span *ngFor="let t of techStack" class="tech-tag">{{ t }}</span>
+                <span *ngFor="let tech of techStack" class="tech-tag">{{ tech }}</span>
               </div>
             </div>
+
             <div class="about-timeline">
-              <div class="timeline-item" *ngFor="let ev of timeline">
+              <div class="timeline-item" *ngFor="let event of timeline">
                 <div class="timeline-dot"></div>
                 <div class="timeline-content">
-                  <span class="timeline-date">{{ ev.date }}</span>
-                  <span class="timeline-text">{{ ev.text }}</span>
+                  <span class="timeline-date">{{ event.date }}</span>
+                  <span class="timeline-text">{{ event.text }}</span>
                 </div>
               </div>
             </div>
@@ -113,81 +165,92 @@ import { RouterLink } from '@angular/router';
         </div>
       </section>
 
-      <!-- Showcase Section - Original Characters -->
       <section class="showcase">
         <div class="section-container">
           <div class="section-header">
-            <h2>Personagens Lendários</h2>
-            <p>Os personagens que inspiraram tudo isso</p>
+            <h2>Legado 2023</h2>
+            <p>Os personagens que dão identidade narrativa e afetiva ao projeto.</p>
           </div>
+
           <div class="showcase-grid">
-            <div class="showcase-card augustus">
+            <article class="showcase-card augustus">
               <div class="showcase-badge">D&D 5e</div>
               <div class="showcase-avatar">A</div>
               <h3>Augustus Frostborne</h3>
-              <p class="showcase-quote">"Every wizard has a past..."</p>
+              <p class="showcase-quote">"Todo mago carrega um passado que ainda não terminou de cobrar."</p>
               <div class="showcase-stats">
                 <div class="sstat"><span class="sstat-label">Raça</span><span class="sstat-val">Humano</span></div>
                 <div class="sstat"><span class="sstat-label">Classe</span><span class="sstat-val">Mago</span></div>
                 <div class="sstat"><span class="sstat-label">Nível</span><span class="sstat-val">1</span></div>
               </div>
-              <p class="showcase-bio">Nascido em uma vila que temia a magia, Augustus encontrou um colar misterioso e um grimório antigo na floresta quando criança. Praticou magia em segredo até o dia em que salvou sua vila de um incêndio — e foi expulso por isso. Agora vaga por terras desconhecidas, oferecendo curas e conhecimento por preços justos.</p>
+              <p class="showcase-bio">
+                Expulso da própria vila depois de salvar todos com magia, Augustus transformou trauma em estudo e estudo
+                em poder. É o elo entre o compêndio, o mistério arcano e a memória da campanha.
+              </p>
               <div class="showcase-details">
-                <span>🧊 Raio de Gelo</span>
-                <span>🔥 Raio de Fogo</span>
-                <span>✨ Ilusão Menor</span>
-                <span>📖 Antecedente: Sábio</span>
-                <span>🗣️ Comum e Élfico</span>
+                <span>Raio de gelo</span>
+                <span>Raio de fogo</span>
+                <span>Ilusão menor</span>
+                <span>Antecedente: sábio</span>
+                <span>Comum e élfico</span>
               </div>
-            </div>
-            <div class="showcase-card satoru">
+            </article>
+
+            <article class="showcase-card satoru">
               <div class="showcase-badge">Homebrew</div>
               <div class="showcase-avatar">S</div>
               <h3>Satoru Naitokira</h3>
-              <p class="showcase-quote">"Lembranças, como lâminas, são mais afiadas quando compartilhadas."</p>
+              <p class="showcase-quote">"Lembranças, como lâminas, cortam melhor quando voltam à mão certa."</p>
               <div class="showcase-stats">
                 <div class="sstat"><span class="sstat-label">Ambientação</span><span class="sstat-val">Japonesa</span></div>
                 <div class="sstat"><span class="sstat-label">Estilo</span><span class="sstat-val">Noturno</span></div>
-                <div class="sstat"><span class="sstat-label">Mistério</span><span class="sstat-val">???</span></div>
+                <div class="sstat"><span class="sstat-label">Mistério</span><span class="sstat-val">Alto</span></div>
               </div>
-              <p class="showcase-bio">Um personagem envolto em mistério, com raízes na cultura japonesa. Satoru carrega consigo memórias afiadas e uma presença que oscila entre as sombras das ruas noturnas de uma metrópole.</p>
+              <p class="showcase-bio">
+                Figura central do legado autoral, Satoru representa sigilo, memória e presença urbana. Seu peso ajuda a
+                transformar o produto em algo com assinatura própria, não só utilitário.
+              </p>
               <div class="showcase-details">
-                <span>🌙 Noturno</span>
-                <span>⚔️ Lâminas</span>
-                <span>🏮 Cenário Urbano</span>
+                <span>Noturno</span>
+                <span>Lâminas</span>
+                <span>Cenário urbano</span>
+                <span>Segredos compartilhados</span>
               </div>
-            </div>
+            </article>
           </div>
         </div>
       </section>
 
-      <!-- CTA -->
       <section class="cta">
         <div class="section-container">
           <div class="cta-inner">
-            <h2>Pronto para começar sua aventura?</h2>
-            <p>Crie sua conta gratuitamente e comece a gerenciar suas campanhas de RPG agora.</p>
-            <a routerLink="/auth/register" class="btn btn-primary btn-lg">Criar Conta Grátis</a>
+            <h2>Pronto para abrir a próxima campanha?</h2>
+            <p>Entre, crie sua mesa e deixe a campanha lembrar do que importa.</p>
+            <a routerLink="/auth/register" class="btn btn-primary btn-lg">Criar conta grátis</a>
           </div>
         </div>
       </section>
 
-      <!-- Footer -->
       <footer class="footer">
         <div class="section-container">
           <div class="footer-content">
             <div class="footer-brand">
-              <span class="footer-logo">⚔️ CampaignHub</span>
-              <p>A mega aplicação web de RPG.</p>
+              <span class="footer-logo">
+                <app-icon name="sword" [size]="16"></app-icon>
+                Campaign Hub
+              </span>
+              <p>A ferramenta de mesa viva para campanhas dark fantasy.</p>
             </div>
+
             <div class="footer-links">
-              <a routerLink="/wiki">Wiki RPG</a>
+              <a routerLink="/wiki">Wiki</a>
               <a routerLink="/dice">Dados</a>
-              <a routerLink="/auth/login">Login</a>
+              <a routerLink="/auth/login">Entrar</a>
               <a routerLink="/auth/register">Registrar</a>
             </div>
+
             <div class="footer-credit">
-              <p>Feito com ❤️ por <strong>Augusto Oliveira</strong></p>
+              <p>Feito com cuidado por <strong>Augusto Oliveira</strong></p>
               <p>IFRN Campus Parnamirim — 2023 → 2026</p>
             </div>
           </div>
@@ -195,256 +258,632 @@ import { RouterLink } from '@angular/router';
       </footer>
     </div>
   `,
-  styles: [`
-    .home { background: var(--bg-primary); }
+  styles: [
+    `
+      .home {
+        background: var(--bg-primary);
+      }
 
-    /* Hero */
-    .hero {
-      position: relative; min-height: 100vh; display: flex; align-items: center;
-      justify-content: center; overflow: hidden;
-    }
-    .hero-bg { position: absolute; inset: 0; }
-    .hero-overlay {
-      position: absolute; inset: 0;
-      background: radial-gradient(ellipse at center, rgba(15,15,26,0.6) 0%, rgba(15,15,26,0.95) 70%);
-    }
-    .particles { position: absolute; inset: 0; overflow: hidden; }
-    .particle {
-      position: absolute; bottom: -10px; width: 3px; height: 3px;
-      background: var(--accent-primary); border-radius: 50%; opacity: 0;
-      animation: floatUp 8s ease-in infinite;
-    }
-    @keyframes floatUp {
-      0% { opacity: 0; transform: translateY(0); }
-      10% { opacity: 0.8; }
-      90% { opacity: 0.2; }
-      100% { opacity: 0; transform: translateY(-100vh); }
-    }
-    .hero-content {
-      position: relative; z-index: 2; text-align: center;
-      max-width: 700px; padding: 2rem;
-    }
-    .hero-badge {
-      display: inline-block; padding: 0.375rem 1rem; border-radius: 9999px;
-      background: rgba(201,168,76,0.1); border: 1px solid rgba(201,168,76,0.25);
-      color: var(--accent-primary); font-size: 0.8rem; font-weight: 600;
-      letter-spacing: 0.05em; margin-bottom: 1.5rem;
-    }
-    .hero-content h1 {
-      font-family: var(--font-display); font-size: clamp(2.5rem, 6vw, 4.5rem);
-      line-height: 1.1; margin-bottom: 1.25rem; color: var(--text-primary);
-    }
-    .accent { color: var(--accent-primary); }
-    .hero-tagline { font-size: 1.15rem; color: var(--text-secondary); margin-bottom: 0.5rem; line-height: 1.6; }
-    .hero-sub { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 2rem; }
-    .hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
-    .hero-scroll-hint {
-      margin-top: 3rem; display: flex; flex-direction: column; align-items: center;
-      gap: 0.25rem; cursor: pointer; color: var(--text-muted); font-size: 0.75rem;
-      animation: pulse 2s ease infinite;
-    }
-    .scroll-arrow { font-size: 1rem; animation: bounce 1.5s ease infinite; }
-    @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+      .hero {
+        position: relative;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
 
-    /* Sections common */
-    section { padding: 5rem 0; }
-    .section-container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
-    .section-header { text-align: center; margin-bottom: 3rem; }
-    .section-header h2 { font-family: var(--font-display); font-size: 2rem; margin-bottom: 0.5rem; }
-    .section-header p { color: var(--text-secondary); font-size: 1rem; }
+      .hero-bg {
+        position: absolute;
+        inset: 0;
+      }
 
-    /* Features */
-    .features { background: var(--bg-surface); }
-    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; }
-    .feature-card {
-      background: var(--bg-card); border: 1px solid var(--border-color);
-      border-radius: var(--radius-lg); padding: 2rem 1.5rem;
-      transition: all var(--transition-normal); text-align: center;
-    }
-    .feature-card:hover { border-color: var(--border-glow); transform: translateY(-4px); box-shadow: var(--shadow-glow); }
-    .feature-icon { font-size: 2.5rem; margin-bottom: 1rem; }
-    .feature-card h3 { font-family: var(--font-display); font-size: 1.1rem; margin-bottom: 0.5rem; color: var(--accent-primary); }
-    .feature-card p { color: var(--text-secondary); font-size: 0.875rem; line-height: 1.6; }
+      .hero-overlay {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse at center, rgba(15, 15, 26, 0.58) 0%, rgba(15, 15, 26, 0.95) 72%);
+      }
 
-    /* Systems */
-    .systems-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; }
-    .system-card {
-      background: var(--bg-card); border: 1px solid var(--border-color);
-      border-radius: var(--radius-lg); padding: 2rem 1.5rem;
-      text-align: center; transition: all var(--transition-normal); position: relative; overflow: hidden;
-    }
-    .system-card:hover { transform: translateY(-4px); border-color: var(--accent-primary); }
-    .system-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
-    .system-card h3 { font-family: var(--font-display); font-size: 1rem; margin-bottom: 0.375rem; color: var(--accent-primary); }
-    .system-card p { font-size: 0.8rem; color: var(--text-secondary); }
-    .system-accent-line {
-      position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
-      background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
-      opacity: 0; transition: opacity var(--transition-normal);
-    }
-    .system-card:hover .system-accent-line { opacity: 1; }
+      .particles {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+      }
 
-    /* Dice */
-    .dice-section { background: var(--bg-surface); }
-    .dice-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; }
-    .dice-text h2 { font-family: var(--font-display); font-size: 1.75rem; margin-bottom: 1rem; }
-    .dice-text p { color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.7; }
-    .dice-demo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-    .demo-dice {
-      background: var(--bg-card); border: 1px solid var(--border-color);
-      border-radius: var(--radius-md); padding: 1.25rem 0.75rem;
-      text-align: center; cursor: pointer; transition: all var(--transition-normal);
-      display: flex; flex-direction: column; align-items: center; gap: 0.375rem;
-    }
-    .demo-dice:hover { border-color: var(--accent-primary); transform: scale(1.05); box-shadow: var(--shadow-glow); }
-    .demo-dice:active { transform: scale(0.95); }
-    .dice-face { font-size: 1.5rem; }
-    .dice-label { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
-    .dice-result {
-      font-family: var(--font-display); font-size: 1.25rem; color: var(--accent-primary);
-      font-weight: 700; animation: slideUp 0.3s ease;
-    }
+      .particle {
+        position: absolute;
+        bottom: -10px;
+        width: 3px;
+        height: 3px;
+        border-radius: 50%;
+        background: var(--accent-primary);
+        opacity: 0;
+        animation: floatUp 8s ease-in infinite;
+      }
 
-    /* About */
-    .about-inner { display: grid; grid-template-columns: 1.5fr 1fr; gap: 3rem; align-items: start; }
-    .about-text h2 { font-family: var(--font-display); font-size: 1.75rem; margin-bottom: 1rem; }
-    .about-text p { color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.7; font-size: 0.95rem; }
-    .about-text strong { color: var(--accent-primary); }
-    .about-tech { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.5rem; }
-    .tech-tag {
-      padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600;
-      background: rgba(201,168,76,0.1); color: var(--accent-primary);
-      border: 1px solid rgba(201,168,76,0.2);
-    }
-    .about-timeline { position: relative; padding-left: 1.5rem; border-left: 2px solid var(--border-color); }
-    .timeline-item { position: relative; margin-bottom: 1.5rem; padding-left: 1rem; }
-    .timeline-dot {
-      position: absolute; left: -1.85rem; top: 0.25rem; width: 12px; height: 12px;
-      border-radius: 50%; background: var(--accent-primary); border: 2px solid var(--bg-primary);
-    }
-    .timeline-content { display: flex; flex-direction: column; gap: 0.125rem; }
-    .timeline-date { font-size: 0.75rem; color: var(--accent-primary); font-weight: 700; font-family: var(--font-display); }
-    .timeline-text { font-size: 0.85rem; color: var(--text-secondary); }
+      @keyframes floatUp {
+        0% {
+          opacity: 0;
+          transform: translateY(0);
+        }
+        10% {
+          opacity: 0.8;
+        }
+        90% {
+          opacity: 0.2;
+        }
+        100% {
+          opacity: 0;
+          transform: translateY(-100vh);
+        }
+      }
 
-    /* Showcase */
-    .showcase { background: var(--bg-surface); }
-    .showcase-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 2rem; }
-    .showcase-card {
-      background: var(--bg-card); border: 1px solid var(--border-color);
-      border-radius: var(--radius-lg); padding: 2rem; position: relative;
-      transition: all var(--transition-normal);
-    }
-    .showcase-card:hover { border-color: var(--border-glow); box-shadow: var(--shadow-glow); }
-    .showcase-card.augustus { --card-accent: #c9a84c; }
-    .showcase-card.satoru { --card-accent: #e11d48; }
-    .showcase-badge {
-      position: absolute; top: 1rem; right: 1rem; padding: 0.2rem 0.65rem;
-      border-radius: 9999px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
-      background: rgba(201,168,76,0.15); color: var(--accent-primary);
-      border: 1px solid rgba(201,168,76,0.25);
-    }
-    .satoru .showcase-badge { background: rgba(225,29,72,0.15); color: #e11d48; border-color: rgba(225,29,72,0.25); }
-    .showcase-avatar {
-      width: 56px; height: 56px; border-radius: var(--radius-md);
-      background: linear-gradient(135deg, var(--card-accent), var(--accent-secondary));
-      color: #0f0f1a; display: flex; align-items: center; justify-content: center;
-      font-size: 1.5rem; font-weight: 700; font-family: var(--font-display); margin-bottom: 1rem;
-    }
-    .showcase-card h3 { font-size: 1.25rem; margin-bottom: 0.25rem; }
-    .showcase-quote {
-      font-style: italic; color: var(--text-muted); font-size: 0.85rem;
-      margin-bottom: 1rem; font-family: var(--font-fantasy);
-    }
-    .showcase-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 1rem; }
-    .sstat {
-      background: rgba(255,255,255,0.03); padding: 0.5rem; border-radius: var(--radius-sm); text-align: center;
-    }
-    .sstat-label { display: block; font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-    .sstat-val { display: block; font-size: 0.85rem; font-weight: 600; color: var(--card-accent); margin-top: 0.125rem; }
-    .showcase-bio { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.7; margin-bottom: 1rem; }
-    .showcase-details { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-    .showcase-details span {
-      padding: 0.2rem 0.6rem; border-radius: var(--radius-sm); font-size: 0.7rem;
-      background: rgba(255,255,255,0.04); color: var(--text-secondary);
-      border: 1px solid rgba(255,255,255,0.06);
-    }
+      .hero-content {
+        position: relative;
+        z-index: 2;
+        max-width: 760px;
+        padding: 2rem;
+        text-align: center;
+      }
 
-    /* CTA */
-    .cta { background: var(--bg-primary); }
-    .cta-inner {
-      text-align: center; padding: 3rem; border-radius: var(--radius-lg);
-      background: linear-gradient(135deg, rgba(201,168,76,0.08), rgba(139,92,246,0.08));
-      border: 1px solid var(--border-color);
-    }
-    .cta-inner h2 { font-family: var(--font-display); font-size: 1.75rem; margin-bottom: 0.75rem; }
-    .cta-inner p { color: var(--text-secondary); margin-bottom: 1.5rem; }
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        margin-bottom: 1.5rem;
+        padding: 0.38rem 1rem;
+        border-radius: 999px;
+        border: 1px solid rgba(201, 168, 76, 0.25);
+        background: rgba(201, 168, 76, 0.1);
+        color: var(--accent-primary);
+        font-size: 0.82rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+      }
 
-    /* Footer */
-    .footer { padding: 3rem 0; border-top: 1px solid var(--border-color); background: var(--bg-surface); }
-    .footer-content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem; }
-    .footer-logo { font-family: var(--font-display); font-size: 1.1rem; color: var(--accent-primary); font-weight: 700; }
-    .footer-brand p { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
-    .footer-links { display: flex; gap: 1.5rem; }
-    .footer-links a { font-size: 0.85rem; color: var(--text-secondary); }
-    .footer-links a:hover { color: var(--accent-primary); }
-    .footer-credit { text-align: right; }
-    .footer-credit p { font-size: 0.8rem; color: var(--text-muted); }
-    .footer-credit strong { color: var(--accent-primary); }
+      .hero-content h1 {
+        margin: 0 0 1rem;
+        font-size: clamp(2.8rem, 7vw, 5rem);
+        line-height: 1.05;
+      }
 
-    @media (max-width: 768px) {
-      .dice-inner { grid-template-columns: 1fr; }
-      .about-inner { grid-template-columns: 1fr; }
-      .showcase-grid { grid-template-columns: 1fr; }
-      .footer-content { flex-direction: column; text-align: center; }
-      .footer-credit { text-align: center; }
-      .footer-links { flex-wrap: wrap; justify-content: center; }
-    }
-  `]
+      .accent {
+        color: var(--accent-primary);
+      }
+
+      .hero-tagline {
+        font-size: 1.15rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.55rem;
+        line-height: 1.6;
+      }
+
+      .hero-sub {
+        font-size: 0.95rem;
+        color: var(--text-muted);
+        margin-bottom: 2rem;
+      }
+
+      .hero-actions {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .hero-scroll-hint {
+        margin: 3rem auto 0;
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.2rem;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        animation: pulse 2s ease infinite;
+      }
+
+      section {
+        padding: 5rem 0;
+      }
+
+      .section-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 2rem;
+      }
+
+      .section-header {
+        text-align: center;
+        margin-bottom: 3rem;
+      }
+
+      .section-header h2 {
+        margin-bottom: 0.45rem;
+        font-size: 2rem;
+      }
+
+      .section-header p {
+        color: var(--text-secondary);
+      }
+
+      .features {
+        background: var(--bg-surface);
+      }
+
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+      }
+
+      .feature-card,
+      .system-card {
+        padding: 1.8rem 1.5rem;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-color);
+        background: var(--bg-card);
+        transition: transform var(--transition-normal), border-color var(--transition-normal), box-shadow var(--transition-normal);
+      }
+
+      .feature-card:hover,
+      .system-card:hover {
+        transform: translateY(-3px);
+        border-color: rgba(201, 168, 76, 0.32);
+        box-shadow: 0 18px 35px rgba(0, 0, 0, 0.22);
+      }
+
+      .feature-icon,
+      .system-icon {
+        width: 3.1rem;
+        height: 3.1rem;
+        margin-bottom: 1rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        color: var(--accent-primary);
+        background: rgba(201, 168, 76, 0.12);
+      }
+
+      .feature-card h3,
+      .system-card h3 {
+        margin: 0 0 0.5rem;
+        color: var(--accent-primary);
+      }
+
+      .feature-card p,
+      .system-card p {
+        margin: 0;
+        color: var(--text-secondary);
+        line-height: 1.6;
+      }
+
+      .systems-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.5rem;
+      }
+
+      .system-card {
+        position: relative;
+        overflow: hidden;
+        text-align: center;
+      }
+
+      .system-icon {
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .system-accent-line {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        opacity: 0;
+        background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+        transition: opacity var(--transition-normal);
+      }
+
+      .system-card:hover .system-accent-line {
+        opacity: 1;
+      }
+
+      .dice-section {
+        background: var(--bg-surface);
+      }
+
+      .dice-inner {
+        display: grid;
+        grid-template-columns: 1.1fr 1fr;
+        gap: 3rem;
+        align-items: center;
+      }
+
+      .section-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: var(--accent-primary);
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: 700;
+      }
+
+      .dice-text h2 {
+        margin: 0.8rem 0 0.8rem;
+        font-size: 1.85rem;
+      }
+
+      .dice-text p {
+        color: var(--text-secondary);
+        line-height: 1.7;
+        margin-bottom: 1.5rem;
+      }
+
+      .dice-demo {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+      }
+
+      .demo-dice {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 1.2rem 0.8rem;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        background: var(--bg-card);
+        color: var(--text-primary);
+        cursor: pointer;
+        transition: transform var(--transition-normal), border-color var(--transition-normal), box-shadow var(--transition-normal);
+      }
+
+      .demo-dice:hover {
+        transform: scale(1.03);
+        border-color: rgba(201, 168, 76, 0.3);
+        box-shadow: var(--shadow-arcane);
+      }
+
+      .dice-face {
+        color: var(--accent-primary);
+      }
+
+      .dice-label {
+        font-size: 0.76rem;
+        color: var(--text-muted);
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .dice-result {
+        color: var(--accent-primary);
+        font-family: var(--font-display);
+        font-size: 1.25rem;
+      }
+
+      .about-inner {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 3rem;
+        align-items: start;
+      }
+
+      .about-text p {
+        color: var(--text-secondary);
+        line-height: 1.7;
+      }
+
+      .about-tech {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 1.5rem;
+      }
+
+      .tech-tag {
+        padding: 0.25rem 0.75rem;
+        border-radius: 999px;
+        border: 1px solid rgba(201, 168, 76, 0.2);
+        background: rgba(201, 168, 76, 0.08);
+        color: var(--accent-primary);
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+
+      .about-timeline {
+        position: relative;
+        padding-left: 1.4rem;
+        border-left: 2px solid var(--border-color);
+      }
+
+      .timeline-item {
+        position: relative;
+        margin-bottom: 1.5rem;
+        padding-left: 1rem;
+      }
+
+      .timeline-dot {
+        position: absolute;
+        left: -1.8rem;
+        top: 0.3rem;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--accent-primary);
+        border: 2px solid var(--bg-primary);
+      }
+
+      .timeline-date {
+        display: block;
+        color: var(--accent-primary);
+        font-family: var(--font-display);
+        font-size: 0.78rem;
+        font-weight: 700;
+      }
+
+      .timeline-text {
+        color: var(--text-secondary);
+      }
+
+      .showcase {
+        background: var(--bg-surface);
+      }
+
+      .showcase-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+        gap: 2rem;
+      }
+
+      .showcase-card {
+        position: relative;
+        padding: 2rem;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-color);
+        background: var(--bg-card);
+        transition: border-color var(--transition-normal), box-shadow var(--transition-normal), transform var(--transition-normal);
+      }
+
+      .showcase-card:hover {
+        transform: translateY(-3px);
+        border-color: rgba(201, 168, 76, 0.32);
+        box-shadow: 0 18px 35px rgba(0, 0, 0, 0.22);
+      }
+
+      .showcase-card.augustus {
+        --card-accent: #c9a84c;
+      }
+
+      .showcase-card.satoru {
+        --card-accent: #e11d48;
+      }
+
+      .showcase-badge {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        padding: 0.22rem 0.68rem;
+        border-radius: 999px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        background: rgba(201, 168, 76, 0.15);
+        color: var(--card-accent);
+        border: 1px solid rgba(201, 168, 76, 0.25);
+      }
+
+      .showcase-avatar {
+        width: 58px;
+        height: 58px;
+        border-radius: var(--radius-md);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, var(--card-accent), var(--accent-secondary));
+        color: #15120a;
+        font-family: var(--font-display);
+        font-size: 1.55rem;
+        font-weight: 700;
+      }
+
+      .showcase-card h3 {
+        margin: 0 0 0.2rem;
+      }
+
+      .showcase-quote {
+        margin-bottom: 1rem;
+        color: var(--text-muted);
+        font-style: italic;
+      }
+
+      .showcase-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.55rem;
+        margin-bottom: 1rem;
+      }
+
+      .sstat {
+        padding: 0.55rem;
+        border-radius: var(--radius-sm);
+        background: rgba(255, 255, 255, 0.03);
+        text-align: center;
+      }
+
+      .sstat-label {
+        display: block;
+        color: var(--text-muted);
+        font-size: 0.64rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .sstat-val {
+        display: block;
+        margin-top: 0.15rem;
+        color: var(--card-accent);
+        font-weight: 700;
+      }
+
+      .showcase-bio {
+        color: var(--text-secondary);
+        line-height: 1.7;
+      }
+
+      .showcase-details {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+      }
+
+      .showcase-details span {
+        padding: 0.24rem 0.62rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-secondary);
+        font-size: 0.76rem;
+      }
+
+      .cta-inner {
+        padding: 3rem;
+        border-radius: var(--radius-lg);
+        text-align: center;
+        border: 1px solid var(--border-color);
+        background: linear-gradient(135deg, rgba(201, 168, 76, 0.08), rgba(139, 92, 246, 0.08));
+      }
+
+      .cta-inner h2 {
+        margin-bottom: 0.7rem;
+      }
+
+      .cta-inner p {
+        color: var(--text-secondary);
+        margin-bottom: 1.4rem;
+      }
+
+      .footer {
+        padding: 3rem 0;
+        border-top: 1px solid var(--border-color);
+        background: var(--bg-surface);
+      }
+
+      .footer-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+      }
+
+      .footer-logo {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        color: var(--accent-primary);
+        font-weight: 700;
+      }
+
+      .footer-brand p,
+      .footer-credit p {
+        margin: 0.2rem 0 0;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+      }
+
+      .footer-links {
+        display: flex;
+        gap: 1.25rem;
+      }
+
+      .footer-links a {
+        color: var(--text-secondary);
+        text-decoration: none;
+      }
+
+      .footer-links a:hover {
+        color: var(--accent-primary);
+      }
+
+      .footer-credit {
+        text-align: right;
+      }
+
+      @media (max-width: 900px) {
+        .dice-inner,
+        .about-inner {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .showcase-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .footer-content {
+          flex-direction: column;
+          text-align: center;
+        }
+
+        .footer-credit {
+          text-align: center;
+        }
+      }
+    `,
+  ],
 })
 export class HomeComponent {
-  particles = Array.from({ length: 30 }, (_, i) => ({
+  particles = Array.from({ length: 30 }, () => ({
     x: Math.random() * 100,
     delay: Math.random() * 8,
-    dur: 6 + Math.random() * 6
+    dur: 6 + Math.random() * 6,
   }));
 
-  features = [
-    { icon: '🗺️', title: 'Campanhas', desc: 'Crie e gerencie campanhas de RPG com múltiplos sistemas. Organize tudo em um só lugar.' },
-    { icon: '⚔️', title: 'Personagens', desc: 'Cadastre personagens com classe, nível e XP. Acompanhe a evolução ao longo das sessões.' },
-    { icon: '📅', title: 'Sessões', desc: 'Registre cada sessão com resumo, data e XP distribuído automaticamente aos personagens.' },
-    { icon: '💎', title: 'Loot', desc: 'Controle itens e tesouros encontrados. Atribua loot a personagens específicos.' },
-    { icon: '🎲', title: 'Dados', desc: 'Role d4 a d100 direto no navegador. Geração de atributos com 4d6 drop lowest.' },
-    { icon: '🔔', title: 'Notificações', desc: 'Receba alertas sobre eventos das suas campanhas. Nunca perca uma sessão.' },
+  features: FeatureCard[] = [
+    { icon: 'map', title: 'Campanhas', desc: 'Crie mesas, sistemas e grupos com uma estrutura que continua viva após cada sessão.' },
+    { icon: 'sword', title: 'Personagens', desc: 'Acompanhe evolução, recursos e vínculos sem espalhar informações em ferramentas separadas.' },
+    { icon: 'calendar', title: 'Sessões', desc: 'Registre recap, ganchos, consequências e XP com memória narrativa conectada.' },
+    { icon: 'book', title: 'Wiki viva', desc: 'Lore, facções, páginas hierárquicas e backlinks úteis antes, durante e depois da mesa.' },
+    { icon: 'dice', title: 'Dados', desc: 'Rolagens rápidas, histórico imediato e utilidade real sem sair da campanha.' },
+    { icon: 'bell', title: 'Presença', desc: 'Eventos, chat, compêndio e mapa conversam entre si e deixam rastros na campanha.' },
   ];
 
-  systems = [
-    { key: 'DND5E', icon: '🐉', name: 'D&D 5e', desc: 'O RPG mais popular do mundo' },
-    { key: 'T20', icon: '⚡', name: 'Tormenta 20', desc: 'O maior RPG brasileiro' },
-    { key: 'CoC', icon: '🐙', name: 'Call of Cthulhu', desc: 'Horror cósmico lovecraftiano' },
-    { key: 'Pathfinder', icon: '🏰', name: 'Pathfinder', desc: 'Aventuras épicas e detalhadas' },
-    { key: 'Other', icon: '🎭', name: 'Outros', desc: 'Qualquer sistema que você jogue' },
+  systems: SystemCard[] = [
+    { key: 'DND5E', icon: 'dice', name: 'D&D 5e', desc: 'Fantasia clássica, combate rápido e muito suporte de mesa.' },
+    { key: 'T20', icon: 'spark', name: 'Tormenta 20', desc: 'Fantasia brasileira com mana, poder heroico e identidade forte.' },
+    { key: 'CoC', icon: 'book', name: 'Call of Cthulhu', desc: 'Investigação, horror cósmico e sanidade como custo dramático.' },
+    { key: 'Pathfinder', icon: 'shield', name: 'Pathfinder', desc: 'Tática profunda, builds detalhadas e grande flexibilidade de combate.' },
   ];
 
-  diceTypes = [
-    { sides: 4, icon: '🔺', label: 'd4', result: 0 },
-    { sides: 6, icon: '🎲', label: 'd6', result: 0 },
-    { sides: 8, icon: '💠', label: 'd8', result: 0 },
-    { sides: 10, icon: '🔟', label: 'd10', result: 0 },
-    { sides: 20, icon: '⭐', label: 'd20', result: 0 },
-    { sides: 100, icon: '💯', label: 'd100', result: 0 },
+  diceTypes: DiceCard[] = [
+    { sides: 4, icon: 'spark', label: 'd4', result: 0 },
+    { sides: 6, icon: 'dice', label: 'd6', result: 0 },
+    { sides: 8, icon: 'shield', label: 'd8', result: 0 },
+    { sides: 10, icon: 'map', label: 'd10', result: 0 },
+    { sides: 20, icon: 'sword', label: 'd20', result: 0 },
+    { sides: 100, icon: 'book', label: 'd100', result: 0 },
   ];
 
-  techStack = ['Angular 17', 'TypeScript', 'Node.js', 'Express', 'Prisma', 'PostgreSQL', 'Docker', 'Nginx', 'JWT', 'SCSS'];
+  techStack = ['Angular 17', 'TypeScript', 'Node.js', 'Express', 'Prisma', 'PostgreSQL', 'Redis', 'Socket.IO', 'Docker', 'Nginx'];
 
   timeline = [
-    { date: 'Jul 2023', text: 'Primeiro site de RPG em HTML/CSS puro — IFRN 1º período' },
-    { date: '2023', text: 'Criação de Augustus Frostborne e Satoru Naitokira' },
-    { date: 'Mar 2025', text: 'Decisão de reconstruir o projeto com Angular' },
-    { date: 'Fev 2026', text: 'Campaign Hub — Full-stack com todas as funcionalidades' },
+    { date: 'Jul 2023', text: 'Primeiro site de RPG em HTML/CSS no IFRN.' },
+    { date: '2023', text: 'Nascimento de Augustus Frostborne e Satoru Naitokira.' },
+    { date: 'Mar 2025', text: 'Decisão de reconstruir o projeto como aplicação real.' },
+    { date: '2026', text: 'Campaign Hub evolui para RPG OS com compêndio, wiki e VTT beta.' },
   ];
 
-  rollDice(d: any): void {
-    d.result = Math.floor(Math.random() * d.sides) + 1;
+  rollDice(dice: DiceCard): void {
+    dice.result = Math.floor(Math.random() * dice.sides) + 1;
   }
 
   scrollTo(id: string): void {

@@ -68,3 +68,16 @@ export const decideSessionProposal = asyncHandler(
     res.json(success(proposal, 'Session proposal decided successfully'));
   }
 );
+
+/**
+ * PATCH /api/session-proposals/:proposalId/cancel
+ * Cancela proposta de sessao em aberto.
+ */
+export const cancelSessionProposal = asyncHandler(
+  async (req: AuthRequest, res: Response, _next: NextFunction) => {
+    const { proposalId } = validate(proposalIdParamsSchema, req.params);
+    const proposal = await proposalService.cancelProposal(proposalId);
+
+    res.json(success(proposal, 'Session proposal cancelled successfully'));
+  }
+);

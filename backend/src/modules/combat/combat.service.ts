@@ -178,10 +178,8 @@ export class CombatService {
       data: payload,
     });
 
-    emitCampaignEvent(encounter.session.campaignId, 'combat:updated', {
-      encounterId,
-      combatant: updatedCombatant,
-    });
+    const updatedEncounter = await this.getEncounter(encounterId);
+    emitCampaignEvent(encounter.session.campaignId, 'combat:updated', updatedEncounter);
 
     return updatedCombatant;
   }
@@ -216,11 +214,40 @@ export class CombatService {
       },
     });
 
-    emitCampaignEvent(encounter.session.campaignId, 'combat:updated', {
-      encounterId,
-      combatant,
-    });
+    const updatedEncounter = await this.getEncounter(encounterId);
+    emitCampaignEvent(encounter.session.campaignId, 'combat:updated', updatedEncounter);
 
     return combatant;
+  }
+
+  async removeCombatant(encounterId: string, combatantId: string) {
+    const encounter = await this.getEncounter(encounterId);
+    const combatant = encounter.combatants.find((item) => item.id === combatantId);
+
+    if (!combatant) {
+      throw new AppError(404, 'Combatant not found');
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.combatant.delete({
+        where: { id: combatantId },
+      });
+
+      const remainingCombatants = encounter.combatants.length - 1;
+      const nextCurrentTurn =
+        remainingCombatants <= 0 ? 0 : Math.min(encounter.currentTurn, remainingCombatants - 1);
+
+      if (nextCurrentTurn !== encounter.currentTurn) {
+        await tx.combatEncounter.update({
+          where: { id: encounterId },
+          data: {
+            currentTurn: nextCurrentTurn,
+          },
+        });
+      }
+    });
+
+    const updatedEncounter = await this.getEncounter(encounterId);
+    emitCampaignEvent(encounter.session.campaignId, 'combat:updated', updatedEncounter);
   }
 }

@@ -26,7 +26,7 @@ const combatantSchema = z.object({
 
 export const createEncounterSchema = z.object({
   name: z.string().trim().min(1).max(120),
-  combatants: z.array(combatantSchema).min(1).max(24),
+  combatants: z.array(combatantSchema).max(24),
 });
 
 export const addCombatantSchema = combatantSchema;

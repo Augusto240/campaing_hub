@@ -172,4 +172,60 @@ export class SessionProposalService {
     emitCampaignEvent(proposal.campaign.id, 'session-proposal:decided', updatedProposal);
     return updatedProposal;
   }
+
+  async cancelProposal(proposalId: string) {
+    const proposal = await prisma.sessionProposal.findUnique({
+      where: { id: proposalId },
+      include: {
+        campaign: {
+          include: {
+            members: {
+              select: { userId: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!proposal) {
+      throw new AppError(404, 'Session proposal not found');
+    }
+
+    if (proposal.status !== 'OPEN') {
+      throw new AppError(400, 'Only open session proposals can be cancelled');
+    }
+
+    const cancelledProposal = await prisma.$transaction(async (tx) => {
+      const updatedProposal = await tx.sessionProposal.update({
+        where: { id: proposalId },
+        data: {
+          status: 'CANCELLED',
+          decidedDate: null,
+        },
+        include: {
+          votes: true,
+          proposer: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+      });
+
+      const recipients = new Set<string>(proposal.campaign.members.map((member) => member.userId));
+      recipients.add(proposal.campaign.ownerId);
+
+      if (recipients.size > 0) {
+        await tx.notification.createMany({
+          data: Array.from(recipients).map((userId) => ({
+            userId,
+            message: `Session proposal for "${proposal.campaign.name}" was cancelled.`,
+          })),
+        });
+      }
+
+      return updatedProposal;
+    });
+
+    emitCampaignEvent(proposal.campaign.id, 'session-proposal:cancelled', cancelledProposal);
+    return cancelledProposal;
+  }
 }

@@ -310,13 +310,18 @@ export class CampaignCombatComponent implements OnInit, OnDestroy {
       });
 
     this.socketService
-      .on<{ encounterId: string; combatant: CombatantView }>('combat:combatant_updated')
+      .on<EncounterView>('combat:updated')
       .pipe(takeUntil(this.destroy$))
-      .subscribe((data) => {
-        const encounter = this.encounters.find((e) => e.id === data.encounterId);
-        if (!encounter) return;
-        const idx = encounter.combatants.findIndex((c) => c.id === data.combatant.id);
-        if (idx >= 0) encounter.combatants[idx] = data.combatant;
+      .subscribe((updatedEncounter) => {
+        const idx = this.encounters.findIndex((encounter) => encounter.id === updatedEncounter.id);
+        if (idx === -1) {
+          this.encounters = [updatedEncounter, ...this.encounters];
+          return;
+        }
+
+        const next = [...this.encounters];
+        next[idx] = updatedEncounter;
+        this.encounters = next;
       });
   }
 

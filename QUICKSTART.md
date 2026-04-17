@@ -13,10 +13,13 @@ cp backend/.env.example backend/.env
 ```bash
 docker compose up -d --build
 ```
+Defaults locais seguros para Postgres, Grafana e `FRONTEND_URL` ja estao no `docker-compose.yml`, entao nao e necessario criar `.env` na raiz para subir a stack.
 4. Verify:
-- Frontend: `http://localhost`
-- API: `http://localhost:3000/api`
-- Health: `http://localhost:3000/health`
+- Frontend: `http://localhost:8081`
+- API: `http://localhost:3002/api`
+- Health: `http://localhost:3002/health`
+- Grafana: `http://localhost:3003`
+- Prometheus: `http://localhost:9091`
 
 ## Manual setup
 
@@ -60,12 +63,12 @@ LOG_LEVEL=info
 
 | Service | Port | Description |
 |---------|------|-------------|
-| PostgreSQL | 5432 | Database |
-| Redis | 6379 | Cache + sessions |
-| Backend | 3000 | API + WebSockets |
-| Frontend | 80 | Angular app |
-| Prometheus | 9090 | Metrics |
-| Grafana | 3001 | Dashboards |
+| PostgreSQL | 5433 | Database |
+| Redis | 6380 | Cache + sessions |
+| Backend | 3002 | API + WebSockets |
+| Frontend | 8081 | Angular app |
+| Prometheus | 9091 | Metrics |
+| Grafana | 3003 | Dashboards |
 
 ## Phase 7 routes (Combat, Creatures, Proposals)
 
@@ -108,6 +111,8 @@ LOG_LEVEL=info
 - `campaign:tabletop:request`
 - `campaign:tabletop:update`
 - `campaign:tabletop:state`
+- `campaign:joined`
+- `campaign:error`
 
 ## Troubleshooting
 

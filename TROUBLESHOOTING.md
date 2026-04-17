@@ -27,7 +27,7 @@ Isso gera os `package-lock.json` necessários.
 **Solução**:
 ```bash
 # Parar containers existentes
-docker-compose down
+docker compose down
 
 # Ou mudar as portas no docker-compose.yml
 ```
@@ -39,13 +39,17 @@ docker-compose down
 # Verificar se o container postgres está rodando
 docker ps
 
+# Garantir segredos da API
+cp backend/.env.example backend/.env
+
 # Ver logs do postgres
-docker-compose logs postgres
+docker compose logs postgres
 
 # Recriar o banco
-docker-compose down -v
-docker-compose up --build
+docker compose down -v
+docker compose up --build
 ```
+O `docker-compose.yml` jÃ¡ possui defaults locais seguros para Postgres, Grafana e `FRONTEND_URL`. O `.env` obrigatÃ³rio fica apenas em `backend/.env`.
 
 ---
 
@@ -106,7 +110,7 @@ cd backend
 npm run prisma:migrate
 
 # Docker
-docker-compose exec backend npx prisma migrate deploy
+docker compose exec backend npx prisma migrate deploy
 ```
 
 ---
@@ -137,7 +141,7 @@ Se nada funcionar, reset completo:
 
 ```bash
 # Parar tudo
-docker-compose down -v
+docker compose down -v
 
 # Limpar cache do Docker
 docker system prune -a
@@ -156,7 +160,7 @@ npm install
 
 # Rebuild Docker
 cd ..
-docker-compose up --build
+docker compose up --build
 ```
 
 ---
@@ -165,16 +169,16 @@ docker-compose up --build
 
 ```bash
 # Ver logs de todos os serviços
-docker-compose logs -f
+docker compose logs -f
 
 # Apenas backend
-docker-compose logs -f backend
+docker compose logs -f backend
 
 # Apenas frontend
-docker-compose logs -f frontend
+docker compose logs -f frontend
 
 # Apenas postgres
-docker-compose logs -f postgres
+docker compose logs -f postgres
 ```
 
 ---
@@ -183,13 +187,13 @@ docker-compose logs -f postgres
 
 ```bash
 # Health check do backend
-curl http://localhost:3000/health
+curl http://localhost:3002/health
 
 # Verificar se Prisma está conectado
-docker-compose exec backend npx prisma db pull
+docker compose exec backend npx prisma db pull
 
 # Acessar banco diretamente
-docker-compose exec postgres psql -U campaign_user -d campaign_hub
+docker compose exec postgres psql -U campaign_hub -d campaign_hub
 ```
 
 ---
@@ -198,11 +202,11 @@ docker-compose exec postgres psql -U campaign_user -d campaign_hub
 
 ```bash
 # Recriar apenas um serviço
-docker-compose up --build backend
+docker compose up --build backend
 
 # Entrar no container
-docker-compose exec backend sh
-docker-compose exec frontend sh
+docker compose exec backend sh
+docker compose exec frontend sh
 
 # Ver volumes
 docker volume ls
@@ -231,13 +235,14 @@ npm run test:coverage
 # Watch mode
 npm run test:watch
 ```
+Os testes do backend sobem um Postgres efÃªmero via Docker, entÃ£o nÃ£o dependem de banco local persistente.
 
 ---
 
 ## Contato e Suporte
 
 Se o problema persistir:
-1. Verifique os logs: `docker-compose logs -f`
+1. Verifique os logs: `docker compose logs -f`
 2. Crie um issue no GitHub com os logs
 3. Inclua informações do sistema (Windows/Mac/Linux, versão Docker)
 

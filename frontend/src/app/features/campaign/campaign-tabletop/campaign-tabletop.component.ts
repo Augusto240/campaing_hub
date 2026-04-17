@@ -5,6 +5,15 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { SocketService } from '../../../core/services/socket.service';
+import {
+  CampaignJoinedEvent,
+  CampaignRealtimeAccessState,
+  CampaignSocketErrorEvent,
+  applyCampaignErrorEvent,
+  applyCampaignJoinedEvent,
+  canManageCampaignRealtime,
+  createInitialCampaignRealtimeAccessState,
+} from '../../../core/types';
 
 type TabletopToken = {
   id: string;
@@ -63,21 +72,37 @@ type TabletopStateEvent = {
             Mapa interativo, tokens arrastaveis e sincronizacao realtime para todos da campanha.
           </p>
         </div>
-        <div class="presence-pill">{{ connectedLabel }}</div>
+        <div class="status-stack">
+          <span class="presence-pill" [attr.data-tone]="realtimeAccess.joined ? 'success' : 'warning'">
+            {{ connectionLabel }}
+          </span>
+          <span class="presence-pill" [attr.data-tone]="canManageTabletop ? 'accent' : 'muted'">
+            {{ permissionLabel }}
+          </span>
+        </div>
       </header>
+
+      <div class="tabletop-notice card" *ngIf="statusMessage">
+        {{ statusMessage }}
+      </div>
 
       <section class="tabletop-grid">
         <aside class="card sidebar">
+          <p class="sidebar-note" *ngIf="!canManageTabletop">
+            Modo leitura ativo. Voce acompanha a mesa, mas apenas o GM altera mapa, fog, luz e tokens.
+          </p>
+
           <h3>Mapa e grade</h3>
           <label class="field-label">URL do mapa</label>
           <input
             class="form-control"
             [(ngModel)]="draftMapUrl"
             placeholder="https://.../mapa.jpg"
+            [disabled]="!canManageTabletop"
           />
           <div class="toolbar-row">
-            <button class="btn btn-outline btn-sm" (click)="applyMapUrl()">Aplicar</button>
-            <button class="btn btn-outline btn-sm" (click)="clearMap()">Limpar</button>
+            <button class="btn btn-outline btn-sm" (click)="applyMapUrl()" [disabled]="!canManageTabletop">Aplicar</button>
+            <button class="btn btn-outline btn-sm" (click)="clearMap()" [disabled]="!canManageTabletop">Limpar</button>
           </div>
 
           <label class="field-label">Tamanho da grade: {{ state.gridSize }} px</label>
@@ -89,19 +114,20 @@ type TabletopStateEvent = {
             class="form-control"
             [ngModel]="state.gridSize"
             (ngModelChange)="updateGridSize($event)"
+            [disabled]="!canManageTabletop"
           />
 
           <hr />
 
           <h3>Fog of War</h3>
           <div class="toolbar-row">
-            <button class="btn btn-outline btn-sm" (click)="fogEditMode = !fogEditMode">
+            <button class="btn btn-outline btn-sm" (click)="toggleFogEditMode()" [disabled]="!canManageTabletop">
               {{ fogEditMode ? 'Pincel ativo' : 'Ativar pincel' }}
             </button>
-            <button class="btn btn-outline btn-sm" (click)="setFogBrushMode('mask')" [disabled]="fogBrushMode === 'mask'">
+            <button class="btn btn-outline btn-sm" (click)="setFogBrushMode('mask')" [disabled]="fogBrushMode === 'mask' || !canManageTabletop">
               Esconder
             </button>
-            <button class="btn btn-outline btn-sm" (click)="setFogBrushMode('reveal')" [disabled]="fogBrushMode === 'reveal'">
+            <button class="btn btn-outline btn-sm" (click)="setFogBrushMode('reveal')" [disabled]="fogBrushMode === 'reveal' || !canManageTabletop">
               Revelar
             </button>
           </div>
@@ -115,9 +141,10 @@ type TabletopStateEvent = {
             class="form-control"
             [ngModel]="state.fog.opacity"
             (ngModelChange)="updateFogOpacity($event)"
+            [disabled]="!canManageTabletop"
           />
 
-          <button class="btn btn-danger btn-sm" (click)="clearFog()" [disabled]="state.fog.maskedCells.length === 0">
+          <button class="btn btn-danger btn-sm" (click)="clearFog()" [disabled]="state.fog.maskedCells.length === 0 || !canManageTabletop">
             Limpar Fog
           </button>
 
@@ -125,8 +152,8 @@ type TabletopStateEvent = {
 
           <h3>Iluminacao Dinamica</h3>
           <div class="toolbar-row">
-            <button class="btn btn-primary btn-sm" (click)="addLightSource()">+ Luz</button>
-            <button class="btn btn-danger btn-sm" (click)="removeSelectedLightSource()" [disabled]="!selectedLightId">
+            <button class="btn btn-primary btn-sm" (click)="addLightSource()" [disabled]="!canManageTabletop">+ Luz</button>
+            <button class="btn btn-danger btn-sm" (click)="removeSelectedLightSource()" [disabled]="!selectedLightId || !canManageTabletop">
               Remover
             </button>
           </div>
@@ -145,21 +172,21 @@ type TabletopStateEvent = {
 
           <div *ngIf="selectedLight as light" class="token-editor">
             <label class="field-label">Raio: {{ light.radius }} px</label>
-            <input type="range" min="60" max="1200" step="10" class="form-control" [ngModel]="light.radius" (ngModelChange)="updateLightRadius($event)" />
+            <input type="range" min="60" max="1200" step="10" class="form-control" [ngModel]="light.radius" (ngModelChange)="updateLightRadius($event)" [disabled]="!canManageTabletop" />
 
             <label class="field-label">Intensidade: {{ light.intensity | number:'1.2-2' }}</label>
-            <input type="range" min="0.15" max="1" step="0.05" class="form-control" [ngModel]="light.intensity" (ngModelChange)="updateLightIntensity($event)" />
+            <input type="range" min="0.15" max="1" step="0.05" class="form-control" [ngModel]="light.intensity" (ngModelChange)="updateLightIntensity($event)" [disabled]="!canManageTabletop" />
 
             <label class="field-label">Cor</label>
-            <input type="color" class="color-input" [ngModel]="light.color" (ngModelChange)="updateLightColor($event)" />
+            <input type="color" class="color-input" [ngModel]="light.color" (ngModelChange)="updateLightColor($event)" [disabled]="!canManageTabletop" />
           </div>
 
           <hr />
 
           <h3>Tokens</h3>
           <div class="toolbar-row">
-            <button class="btn btn-primary btn-sm" (click)="addToken()">+ Token</button>
-            <button class="btn btn-danger btn-sm" [disabled]="!selectedTokenId" (click)="removeSelectedToken()">
+            <button class="btn btn-primary btn-sm" (click)="addToken()" [disabled]="!canManageTabletop">+ Token</button>
+            <button class="btn btn-danger btn-sm" [disabled]="!selectedTokenId || !canManageTabletop" (click)="removeSelectedToken()">
               Remover
             </button>
           </div>
@@ -178,10 +205,10 @@ type TabletopStateEvent = {
 
           <div *ngIf="selectedToken as token" class="token-editor">
             <label class="field-label">Nome</label>
-            <input class="form-control" [ngModel]="token.label" (ngModelChange)="renameToken(token.id, $event)" />
+            <input class="form-control" [ngModel]="token.label" (ngModelChange)="renameToken(token.id, $event)" [disabled]="!canManageTabletop" />
 
             <label class="field-label">Cor</label>
-            <input type="color" class="color-input" [ngModel]="token.color" (ngModelChange)="recolorToken(token.id, $event)" />
+            <input type="color" class="color-input" [ngModel]="token.color" (ngModelChange)="recolorToken(token.id, $event)" [disabled]="!canManageTabletop" />
 
             <label class="field-label">Tamanho</label>
             <input
@@ -192,6 +219,7 @@ type TabletopStateEvent = {
               class="form-control"
               [ngModel]="token.size"
               (ngModelChange)="resizeToken(token.id, $event)"
+              [disabled]="!canManageTabletop"
             />
           </div>
         </aside>
@@ -269,12 +297,41 @@ type TabletopStateEvent = {
         color: var(--text-secondary);
         text-decoration: none;
       }
-      .presence-pill {
+      .status-stack {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
         align-self: flex-start;
+      }
+      .presence-pill {
         border: 1px solid var(--border-color);
         border-radius: 999px;
         padding: 0.35rem 0.7rem;
         font-size: 0.8rem;
+      }
+      .presence-pill[data-tone='success'] {
+        border-color: rgba(16, 185, 129, 0.28);
+        background: rgba(16, 185, 129, 0.12);
+        color: #6ee7b7;
+      }
+      .presence-pill[data-tone='warning'] {
+        border-color: rgba(245, 158, 11, 0.28);
+        background: rgba(245, 158, 11, 0.12);
+        color: #fbbf24;
+      }
+      .presence-pill[data-tone='accent'] {
+        border-color: rgba(201, 168, 76, 0.3);
+        background: rgba(201, 168, 76, 0.14);
+        color: var(--accent-primary);
+      }
+      .presence-pill[data-tone='muted'] {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-secondary);
+      }
+      .tabletop-notice {
+        padding: 0.85rem 1rem;
+        margin-bottom: 1rem;
+        color: var(--text-secondary);
       }
       .tabletop-grid {
         display: grid;
@@ -283,6 +340,11 @@ type TabletopStateEvent = {
       }
       .sidebar {
         padding: 1rem;
+      }
+      .sidebar-note {
+        margin: 0 0 0.9rem;
+        color: var(--text-secondary);
+        font-size: 0.84rem;
       }
       .sidebar h3 {
         margin: 0 0 0.5rem;
@@ -314,9 +376,13 @@ type TabletopStateEvent = {
         align-items: center;
         gap: 0.45rem;
         cursor: pointer;
+        transition: border-color 0.18s ease, transform 0.18s ease;
       }
       .token-item.active {
         border-color: var(--accent-primary);
+      }
+      .token-item:hover {
+        transform: translateY(-1px);
       }
       .dot {
         width: 10px;
@@ -392,6 +458,7 @@ type TabletopStateEvent = {
         cursor: grab;
         user-select: none;
         z-index: 10;
+        transition: box-shadow 0.18s ease, transform 0.18s ease;
       }
       .token.active {
         box-shadow: 0 0 0 2px var(--accent-primary), 0 0 22px rgba(201, 168, 76, 0.4);
@@ -418,12 +485,13 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   @ViewChild('stage') stageRef?: ElementRef<HTMLDivElement>;
 
   campaignId = '';
-  connectedLabel = 'Realtime desconectado';
   draftMapUrl = '';
   selectedTokenId: string | null = null;
   selectedLightId: string | null = null;
   fogEditMode = false;
   fogBrushMode: 'mask' | 'reveal' = 'mask';
+  realtimeAccess: CampaignRealtimeAccessState = createInitialCampaignRealtimeAccessState();
+  statusMessage = 'Entrando na campanha em tempo real...';
 
   state: TabletopState = {
     mapImageUrl: null,
@@ -465,6 +533,22 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
     return this.state.lights.find((light) => light.id === this.selectedLightId);
   }
 
+  get canManageTabletop(): boolean {
+    return canManageCampaignRealtime(this.realtimeAccess);
+  }
+
+  get connectionLabel(): string {
+    return this.realtimeAccess.joined ? 'Realtime conectado' : 'Conectando';
+  }
+
+  get permissionLabel(): string {
+    if (!this.realtimeAccess.joined) {
+      return 'Aguardando acesso';
+    }
+
+    return this.realtimeAccess.isGM ? 'Modo GM' : 'Modo leitura';
+  }
+
   get fogCells(): Array<{ key: string; left: number; top: number; size: number }> {
     const size = this.state.fog.cellSize || this.state.gridSize;
 
@@ -488,6 +572,34 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
     }
 
     this.socketService.connect();
+    this.socketService
+      .on<CampaignJoinedEvent>('campaign:joined')
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((event) => {
+        this.realtimeAccess = applyCampaignJoinedEvent(this.realtimeAccess, this.campaignId, event);
+        if (event.campaignId !== this.campaignId) {
+          return;
+        }
+
+        this.statusMessage = event.isGM
+          ? 'Mesa liberada para o mestre.'
+          : 'Modo leitura ativo. Atualizacoes chegam em tempo real, mas alteracoes ficam com o GM.';
+        this.socketService.emit('campaign:tabletop:request', this.campaignId);
+      });
+
+    this.socketService
+      .on<CampaignSocketErrorEvent>('campaign:error')
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((event) => {
+        const nextState = applyCampaignErrorEvent(this.realtimeAccess, this.campaignId, event);
+        if (nextState === this.realtimeAccess) {
+          return;
+        }
+
+        this.realtimeAccess = nextState;
+        this.statusMessage = event.message;
+      });
+
     this.socketService.joinCampaign(this.campaignId);
 
     this.socketService
@@ -498,12 +610,9 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
           return;
         }
 
-        this.connectedLabel = 'Realtime conectado';
         this.state = this.normalizeState(event.state);
         this.draftMapUrl = this.state.mapImageUrl || '';
       });
-
-    this.socketService.emit('campaign:tabletop:request', this.campaignId);
 
     window.addEventListener('mousemove', this.onWindowMouseMove);
     window.addEventListener('mouseup', this.onWindowMouseUp);
@@ -522,17 +631,25 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   }
 
   applyMapUrl(): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode alterar o mapa da mesa.')) {
+      return;
+    }
+
     const value = this.draftMapUrl.trim();
     this.pushState({ mapImageUrl: value.length > 0 ? value : null });
   }
 
   clearMap(): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode alterar o mapa da mesa.')) {
+      return;
+    }
+
     this.draftMapUrl = '';
     this.pushState({ mapImageUrl: null });
   }
 
   onStageClick(event: MouseEvent): void {
-    if (!this.fogEditMode) {
+    if (!this.fogEditMode || !this.ensureCanManageTabletop('Somente o GM pode editar o fog of war.')) {
       return;
     }
 
@@ -565,10 +682,26 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   }
 
   setFogBrushMode(mode: 'mask' | 'reveal'): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode editar o fog of war.')) {
+      return;
+    }
+
     this.fogBrushMode = mode;
   }
 
+  toggleFogEditMode(): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode editar o fog of war.')) {
+      return;
+    }
+
+    this.fogEditMode = !this.fogEditMode;
+  }
+
   updateFogOpacity(value: number | string): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode ajustar o fog of war.')) {
+      return;
+    }
+
     const opacity = Number(value);
     if (!Number.isFinite(opacity)) {
       return;
@@ -582,6 +715,10 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   }
 
   clearFog(): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode limpar o fog of war.')) {
+      return;
+    }
+
     this.pushState({
       fog: {
         maskedCells: [],
@@ -590,6 +727,10 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   }
 
   addLightSource(): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode adicionar luzes na mesa.')) {
+      return;
+    }
+
     const stageElement = this.stageRef?.nativeElement;
     const x = stageElement ? stageElement.clientWidth / 2 : 280;
     const y = stageElement ? stageElement.clientHeight / 2 : 220;
@@ -617,6 +758,10 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   }
 
   removeSelectedLightSource(): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode remover luzes da mesa.')) {
+      return;
+    }
+
     if (!this.selectedLightId) {
       return;
     }
@@ -633,6 +778,10 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   }
 
   updateLightRadius(value: number | string): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode ajustar luzes da mesa.')) {
+      return;
+    }
+
     const selected = this.selectedLight;
     const nextRadius = Number(value);
     if (!selected || !Number.isFinite(nextRadius)) {
@@ -643,6 +792,10 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   }
 
   updateLightIntensity(value: number | string): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode ajustar luzes da mesa.')) {
+      return;
+    }
+
     const selected = this.selectedLight;
     const nextIntensity = Number(value);
     if (!selected || !Number.isFinite(nextIntensity)) {
@@ -653,6 +806,10 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   }
 
   updateLightColor(color: string): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode ajustar luzes da mesa.')) {
+      return;
+    }
+
     if (!this.selectedLight) {
       return;
     }
@@ -665,6 +822,10 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   }
 
   updateGridSize(value: number | string): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode alterar a grade da mesa.')) {
+      return;
+    }
+
     const grid = Number(value);
     if (!Number.isFinite(grid)) {
       return;
@@ -674,6 +835,10 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   }
 
   addToken(): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode adicionar tokens na mesa.')) {
+      return;
+    }
+
     const token: TabletopToken = {
       id: `token_${Date.now()}_${Math.round(Math.random() * 9999)}`,
       label: `Token ${this.state.tokens.length + 1}`,
@@ -692,6 +857,10 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   }
 
   removeSelectedToken(): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode remover tokens da mesa.')) {
+      return;
+    }
+
     if (!this.selectedTokenId) {
       return;
     }
@@ -702,14 +871,26 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   }
 
   renameToken(tokenId: string, label: string): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode editar tokens da mesa.')) {
+      return;
+    }
+
     this.patchToken(tokenId, { label: label.slice(0, 60) });
   }
 
   recolorToken(tokenId: string, color: string): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode editar tokens da mesa.')) {
+      return;
+    }
+
     this.patchToken(tokenId, { color });
   }
 
   resizeToken(tokenId: string, sizeValue: number | string): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode editar tokens da mesa.')) {
+      return;
+    }
+
     const size = Number(sizeValue);
     if (!Number.isFinite(size)) {
       return;
@@ -719,6 +900,10 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
   }
 
   startDrag(event: MouseEvent, tokenId: string): void {
+    if (!this.ensureCanManageTabletop('Somente o GM pode mover tokens da mesa.')) {
+      return;
+    }
+
     const token = this.state.tokens.find((item) => item.id === tokenId);
     const stageRect = this.stageRef?.nativeElement.getBoundingClientRect();
     if (!token) {
@@ -730,6 +915,15 @@ export class CampaignTabletopComponent implements OnInit, OnDestroy {
     this.dragPointerOffsetX = event.clientX - (token.x + (stageRect?.left ?? 0));
     this.dragPointerOffsetY = event.clientY - (token.y + (stageRect?.top ?? 0));
     event.preventDefault();
+  }
+
+  private ensureCanManageTabletop(message: string): boolean {
+    if (this.canManageTabletop) {
+      return true;
+    }
+
+    this.statusMessage = message;
+    return false;
   }
 
   shortLabel(label: string): string {

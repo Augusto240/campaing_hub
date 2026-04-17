@@ -5,6 +5,7 @@ import {
   addCombatant,
   advanceCombatTurn,
   getCombatEncounter,
+  removeCombatant,
   reorderCombatants,
   updateCombatant,
 } from './combat.controller';
@@ -18,5 +19,6 @@ router.patch('/:encounterId/next-turn', isGM, advanceCombatTurn);
 router.patch('/:encounterId/reorder', isGM, reorderCombatants);
 router.patch('/:encounterId/combatants/:combatantId', isGM, updateCombatant);
 router.post('/:encounterId/combatants', isGM, addCombatant);
+router.delete('/:encounterId/combatants/:combatantId', isGM, removeCombatant);
 
 export default router;

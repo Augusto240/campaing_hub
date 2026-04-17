@@ -7,6 +7,15 @@ import { takeUntil } from 'rxjs/operators';
 import { CharacterService } from '../../../core/services/character.service';
 import { DiceRollService } from '../../../core/services/dice-roll.service';
 import { SocketService } from '../../../core/services/socket.service';
+import {
+  CampaignJoinedEvent,
+  CampaignRealtimeAccessState,
+  CampaignSocketErrorEvent,
+  applyCampaignErrorEvent,
+  applyCampaignJoinedEvent,
+  canManageCampaignRealtime,
+  createInitialCampaignRealtimeAccessState,
+} from '../../../core/types';
 
 type CharacterLite = {
   id: string;
@@ -69,15 +78,27 @@ type DiceRealtimeEvent = {
         </div>
 
         <div class="header-actions">
+          <div class="status-stack">
+            <span class="status-pill" [attr.data-tone]="realtimeAccess.joined ? 'success' : 'warning'">
+              {{ connectionLabel }}
+            </span>
+            <span class="status-pill" [attr.data-tone]="canManageBoard ? 'accent' : 'muted'">
+              {{ permissionLabel }}
+            </span>
+          </div>
           <button class="btn btn-outline" (click)="showGrid = !showGrid">
             {{ showGrid ? 'Ocultar grid' : 'Mostrar grid' }}
           </button>
           <button class="btn btn-outline" (click)="snapToGrid = !snapToGrid">
             {{ snapToGrid ? 'Snap ativo' : 'Snap desativado' }}
           </button>
-          <button class="btn btn-danger" (click)="clearBoard()" [disabled]="tokens.length === 0">Limpar mesa</button>
+          <button class="btn btn-danger" (click)="clearBoard()" [disabled]="tokens.length === 0 || !canManageBoard">Limpar mesa</button>
         </div>
       </header>
+
+      <div class="table-notice card" *ngIf="statusMessage">
+        {{ statusMessage }}
+      </div>
 
       <div class="vtt-layout">
         <article class="board card">
@@ -111,14 +132,18 @@ type DiceRealtimeEvent = {
         <aside class="side card">
           <h2>Tokens</h2>
 
+          <p class="side-note" *ngIf="!canManageBoard">
+            Modo leitura ativo. Chat e rolagens seguem disponiveis, mas apenas o GM altera tokens.
+          </p>
+
           <label class="field">
             Nome
-            <input class="form-control" [(ngModel)]="newToken.name" placeholder="Ex: Augustus Frostborne" />
+            <input class="form-control" [(ngModel)]="newToken.name" placeholder="Ex: Augustus Frostborne" [disabled]="!canManageBoard" />
           </label>
 
           <label class="field">
             Vincular personagem
-            <select class="form-control" [(ngModel)]="newToken.characterId" (ngModelChange)="onCharacterSelected($event)">
+            <select class="form-control" [(ngModel)]="newToken.characterId" (ngModelChange)="onCharacterSelected($event)" [disabled]="!canManageBoard">
               <option value="">Sem vinculo</option>
               <option *ngFor="let character of characters" [value]="character.id">{{ character.name }}</option>
             </select>
@@ -127,23 +152,23 @@ type DiceRealtimeEvent = {
           <div class="field-grid">
             <label class="field">
               HP
-              <input class="form-control" type="number" [(ngModel)]="newToken.hp" />
+              <input class="form-control" type="number" [(ngModel)]="newToken.hp" [disabled]="!canManageBoard" />
             </label>
             <label class="field">
               Max HP
-              <input class="form-control" type="number" [(ngModel)]="newToken.maxHp" />
+              <input class="form-control" type="number" [(ngModel)]="newToken.maxHp" [disabled]="!canManageBoard" />
             </label>
             <label class="field">
               Init
-              <input class="form-control" type="number" [(ngModel)]="newToken.initiative" />
+              <input class="form-control" type="number" [(ngModel)]="newToken.initiative" [disabled]="!canManageBoard" />
             </label>
             <label class="field">
               Cor
-              <input class="form-control color-input" type="color" [(ngModel)]="newToken.color" />
+              <input class="form-control color-input" type="color" [(ngModel)]="newToken.color" [disabled]="!canManageBoard" />
             </label>
           </div>
 
-          <button class="btn btn-primary" (click)="addToken()" [disabled]="!newToken.name">Adicionar token</button>
+          <button class="btn btn-primary" (click)="addToken()" [disabled]="!newToken.name || !canManageBoard">Adicionar token</button>
 
           <div class="selected-card" *ngIf="selectedToken">
             <h3>Token selecionado</h3>
@@ -153,7 +178,7 @@ type DiceRealtimeEvent = {
               HP: {{ selectedToken.hp ?? 0 }} / {{ selectedToken.maxHp }}
             </div>
 
-            <div class="selected-actions">
+            <div class="selected-actions" *ngIf="canManageBoard">
               <button class="btn btn-outline btn-sm" (click)="nudgeSelected(-5, 0)">Esq</button>
               <button class="btn btn-outline btn-sm" (click)="nudgeSelected(5, 0)">Dir</button>
               <button class="btn btn-outline btn-sm" (click)="nudgeSelected(0, -5)">Cima</button>
@@ -188,8 +213,9 @@ type DiceRealtimeEvent = {
               [(ngModel)]="chatInput"
               placeholder="Digite uma mensagem para a mesa"
               (keyup.enter)="sendChat()"
+              [disabled]="!realtimeAccess.joined"
             />
-            <button class="btn btn-primary" (click)="sendChat()" [disabled]="!chatInput.trim()">Enviar</button>
+            <button class="btn btn-primary" (click)="sendChat()" [disabled]="!chatInput.trim() || !realtimeAccess.joined">Enviar</button>
           </div>
         </article>
 
@@ -249,6 +275,44 @@ type DiceRealtimeEvent = {
         align-content: start;
         justify-content: flex-end;
       }
+      .status-stack {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: flex-end;
+      }
+      .status-pill {
+        padding: 0.32rem 0.7rem;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 0.78rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .status-pill[data-tone='success'] {
+        border-color: rgba(16, 185, 129, 0.28);
+        background: rgba(16, 185, 129, 0.12);
+        color: #6ee7b7;
+      }
+      .status-pill[data-tone='warning'] {
+        border-color: rgba(245, 158, 11, 0.28);
+        background: rgba(245, 158, 11, 0.12);
+        color: #fbbf24;
+      }
+      .status-pill[data-tone='accent'] {
+        border-color: rgba(201, 168, 76, 0.3);
+        background: rgba(201, 168, 76, 0.14);
+        color: var(--color-primary);
+      }
+      .status-pill[data-tone='muted'] {
+        border-color: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-secondary);
+      }
+      .table-notice {
+        padding: 0.8rem 1rem;
+        color: var(--text-secondary);
+      }
       .vtt-layout {
         display: grid;
         grid-template-columns: minmax(0, 2fr) minmax(280px, 380px);
@@ -302,6 +366,7 @@ type DiceRealtimeEvent = {
         display: grid;
         gap: 0.2rem;
         box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
       }
       .token.selected {
         box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.5), 0 14px 28px rgba(0, 0, 0, 0.45);
@@ -326,6 +391,11 @@ type DiceRealtimeEvent = {
         margin-bottom: 0.75rem;
         color: var(--text-secondary);
         font-size: 0.85rem;
+      }
+      .side-note {
+        margin: 0 0 0.9rem;
+        color: var(--text-secondary);
+        font-size: 0.84rem;
       }
       .field-grid {
         display: grid;
@@ -383,6 +453,7 @@ type DiceRealtimeEvent = {
       .chat-item {
         border-left: 3px solid transparent;
         padding-left: 0.55rem;
+        animation: fadeIn 180ms ease;
       }
       .chat-item[data-kind='chat'] {
         border-left-color: rgba(201, 168, 76, 0.7);
@@ -436,6 +507,16 @@ type DiceRealtimeEvent = {
           justify-content: flex-start;
         }
       }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
     `,
   ],
 })
@@ -474,6 +555,8 @@ export class CampaignVttComponent implements OnInit, OnDestroy {
 
   diceFormula = '1d20+5';
   rollingDice = false;
+  realtimeAccess: CampaignRealtimeAccessState = createInitialCampaignRealtimeAccessState();
+  statusMessage = 'Entrando na campanha em tempo real...';
 
   private draggingTokenId: string | null = null;
   private readonly destroy$ = new Subject<void>();
@@ -491,6 +574,22 @@ export class CampaignVttComponent implements OnInit, OnDestroy {
     }
 
     return this.tokens.find((token) => token.id === this.selectedTokenId) ?? null;
+  }
+
+  get canManageBoard(): boolean {
+    return canManageCampaignRealtime(this.realtimeAccess);
+  }
+
+  get connectionLabel(): string {
+    return this.realtimeAccess.joined ? 'Realtime conectado' : 'Conectando';
+  }
+
+  get permissionLabel(): string {
+    if (!this.realtimeAccess.joined) {
+      return 'Aguardando acesso';
+    }
+
+    return this.realtimeAccess.isGM ? 'Modo GM' : 'Modo leitura';
   }
 
   ngOnInit(): void {
@@ -521,6 +620,34 @@ export class CampaignVttComponent implements OnInit, OnDestroy {
   }
 
   bindRealtime(): void {
+    this.socketService
+      .on<CampaignJoinedEvent>('campaign:joined')
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((event) => {
+        this.realtimeAccess = applyCampaignJoinedEvent(this.realtimeAccess, this.campaignId, event);
+        if (event.campaignId !== this.campaignId) {
+          return;
+        }
+
+        this.statusMessage = event.isGM
+          ? 'Mesa liberada para o mestre.'
+          : 'Modo leitura ativo. Chat e rolagens seguem disponiveis.';
+      });
+
+    this.socketService
+      .on<CampaignSocketErrorEvent>('campaign:error')
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((event) => {
+        const nextState = applyCampaignErrorEvent(this.realtimeAccess, this.campaignId, event);
+        if (nextState === this.realtimeAccess) {
+          return;
+        }
+
+        this.realtimeAccess = nextState;
+        this.statusMessage = event.message;
+        this.appendLocalSystemMessage(event.message);
+      });
+
     this.socketService.joinCampaign(this.campaignId);
 
     this.socketService
@@ -580,6 +707,10 @@ export class CampaignVttComponent implements OnInit, OnDestroy {
   }
 
   addToken(): void {
+    if (!this.ensureCanManageBoard('Somente o GM pode adicionar ou mover tokens nesta mesa.')) {
+      return;
+    }
+
     const id = `token-${Date.now()}`;
 
     const token: VttToken = {
@@ -607,6 +738,10 @@ export class CampaignVttComponent implements OnInit, OnDestroy {
   }
 
   clearBoard(): void {
+    if (!this.ensureCanManageBoard('Somente o GM pode limpar a mesa.')) {
+      return;
+    }
+
     this.tokens = [];
     this.selectedTokenId = null;
 
@@ -618,6 +753,10 @@ export class CampaignVttComponent implements OnInit, OnDestroy {
   }
 
   onTokenPointerDown(token: VttToken, event: PointerEvent): void {
+    if (!this.ensureCanManageBoard('Somente o GM pode mover tokens nesta mesa.')) {
+      return;
+    }
+
     this.selectedTokenId = token.id;
     this.draggingTokenId = token.id;
     event.preventDefault();
@@ -666,6 +805,10 @@ export class CampaignVttComponent implements OnInit, OnDestroy {
   }
 
   nudgeSelected(deltaX: number, deltaY: number): void {
+    if (!this.ensureCanManageBoard('Somente o GM pode reposicionar tokens nesta mesa.')) {
+      return;
+    }
+
     const token = this.selectedToken;
     if (!token) {
       return;
@@ -681,6 +824,10 @@ export class CampaignVttComponent implements OnInit, OnDestroy {
   }
 
   removeSelectedToken(): void {
+    if (!this.ensureCanManageBoard('Somente o GM pode remover tokens nesta mesa.')) {
+      return;
+    }
+
     if (!this.selectedTokenId) {
       return;
     }
@@ -690,6 +837,11 @@ export class CampaignVttComponent implements OnInit, OnDestroy {
   }
 
   sendChat(): void {
+    if (!this.realtimeAccess.joined) {
+      this.statusMessage = 'A mesa ainda nao confirmou seu acesso realtime.';
+      return;
+    }
+
     const text = this.chatInput.trim();
     if (!text) {
       return;
@@ -764,6 +916,29 @@ export class CampaignVttComponent implements OnInit, OnDestroy {
         token,
       });
     }
+  }
+
+  private ensureCanManageBoard(message: string): boolean {
+    if (this.canManageBoard) {
+      return true;
+    }
+
+    this.statusMessage = message;
+    return false;
+  }
+
+  private appendLocalSystemMessage(text: string): void {
+    this.chatMessages = [
+      ...this.chatMessages.slice(-59),
+      {
+        id: `local-${Date.now()}`,
+        authorId: 'campaign-system',
+        authorName: 'Campaign Hub',
+        text,
+        kind: 'system',
+        createdAt: new Date().toISOString(),
+      },
+    ];
   }
 
   private readResourceNumber(

@@ -8,3 +8,4 @@
  */
 
 export * from './api.types';
+export * from './realtime.types';

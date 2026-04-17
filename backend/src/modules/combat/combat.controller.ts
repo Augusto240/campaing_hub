@@ -110,3 +110,16 @@ export const addCombatant = asyncHandler(
     res.status(201).json(success(combatant, 'Combatant added successfully'));
   }
 );
+
+/**
+ * DELETE /api/combat/:encounterId/combatants/:combatantId
+ * Remove combatente do encontro.
+ */
+export const removeCombatant = asyncHandler(
+  async (req: AuthRequest, res: Response, _next: NextFunction) => {
+    const { encounterId, combatantId } = validate(combatantIdParamsSchema, req.params);
+    await combatService.removeCombatant(encounterId, combatantId);
+
+    res.json(success(null, 'Combatant removed successfully'));
+  }
+);

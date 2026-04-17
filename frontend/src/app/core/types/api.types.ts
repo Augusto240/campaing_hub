@@ -630,9 +630,25 @@ export interface DashboardStats {
   totalCampaigns: number;
   totalCharacters: number;
   totalSessions: number;
-  activeCampaigns: Campaign[];
+  totalXPAwarded: number;
+  avgXPPerCampaign: number;
+  mostPlayedSystem: string;
+  systemDistribution: SystemDistributionEntry[];
+  xpOverTime: XPOverTimeEntry[];
   recentActivity: ActivityLogEntry[];
   sessionsPerMonth: SessionsPerMonth[];
+  levelDistribution: CharacterLevelDistribution[];
+}
+
+export interface SystemDistributionEntry {
+  system: string;
+  count: number;
+}
+
+export interface XPOverTimeEntry {
+  date: string;
+  cumulativeXP: number;
+  sessionXP: number;
 }
 
 export interface ActivityLogEntry {
@@ -799,7 +815,7 @@ export interface SpellCastInput {
 }
 
 export interface AddMemberInput {
-  email: string;
+  userId: string;
   role: CampaignRole;
 }
 

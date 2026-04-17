@@ -250,6 +250,44 @@ Cada pesquisa pode exigir um teste social e custo narrativo.
 `,
   },
   {
+    starterSource: 'starter-2026-library-playbook',
+    parentStarterSource: 'starter-2026-location-biblioteca',
+    title: 'Playbook - Biblioteca Silente',
+    category: 'HOUSE_RULE',
+    tags: ['starter-pack', 'playbook', 'biblioteca', 'compendio'],
+    isPublic: false,
+    content: `# Playbook - Biblioteca Silente
+
+## Objetivo da cena
+Transformar consulta de lore em decisao dramatica, nao em pausa de mesa.
+
+## Pacote rapido de consulta
+- [[Detect Magic]]
+- [[Counterspell]]
+- [[Elder Sign]]
+- [[Mythos Tome]]
+- [[Quick Rule - Cover]]
+- [[Potion of Healing]]
+
+## Tabela de pressao
+- Falha social: os escribas cobram um segredo do grupo.
+- Falha arcana: ecos do tomo atraem a [[Faccao - Culto da Mare Oca]].
+- Sucesso total: a cena revela pista para [[Evento - A Queda do Farol Partido]].
+`,
+    blocks: [
+      {
+        blockType: 'CHECKLIST',
+        payload: {
+          items: [
+            { text: 'Preparar um custo narrativo para cada pesquisa', checked: false },
+            { text: 'Conectar a revelacao a um personagem ou faccao', checked: false },
+            { text: 'Registrar nova pista na pagina da sessao', checked: false },
+          ],
+        },
+      },
+    ],
+  },
+  {
     starterSource: 'starter-2026-events',
     parentStarterSource: 'starter-2026-root',
     title: 'Eventos Marcantes',
@@ -261,6 +299,44 @@ Cada pesquisa pode exigir um teste social e custo narrativo.
 - [[Evento - A Queda do Farol Partido]]
 - [[Sessao Marcante - O Farol Partido]]
 `,
+  },
+  {
+    starterSource: 'starter-2026-memory-graph',
+    parentStarterSource: 'starter-2026-root',
+    title: 'Memory Graph - Eixos do Legado',
+    category: 'LORE',
+    tags: ['starter-pack', 'memory-graph', 'legado-2023', 'campaign-os'],
+    isPublic: true,
+    content: `# Memory Graph - Eixos do Legado
+
+## Nucleos que mantem a campanha coesa
+- [[Augustus Frostborne]] conecta trauma, magia e responsabilidade.
+- [[Satoru Naitokira]] conecta memoria, furtividade e diplomacia sombria.
+- [[Evento - A Queda do Farol Partido]] conecta a crise publica e a agenda oculta.
+- [[Local - Biblioteca Silente]] concentra pesquisa, custo e revelacao.
+
+## Reliquias e tecnicas recorrentes
+- [[Frostborne Ember Ray]]
+- [[Satoru Night Mantle]]
+- [[Counterspell]]
+- [[Detect Magic]]
+
+## Regra de direcao
+Toda sessao forte deve cruzar pelo menos um personagem legado, uma faccao e um local.
+`,
+    blocks: [
+      {
+        blockType: 'TABLE',
+        payload: {
+          columns: ['Eixo', 'Conecta', 'Uso em mesa'],
+          rows: [
+            ['Augustus Frostborne', 'arcano e culpa', 'revelacoes e dilemas'],
+            ['Satoru Naitokira', 'memoria e infiltracao', 'segredos e negociacao'],
+            ['Farol Partido', 'crise e politica', 'abertura de sessao'],
+          ],
+        },
+      },
+    ],
   },
   {
     starterSource: 'starter-2026-event-farol',
@@ -354,5 +430,54 @@ Use os templates internos para padronizar notas:
 
 Cada nota deve conectar pelo menos uma faccao, um local e uma sessao.
 `,
+  },
+  {
+    starterSource: 'starter-2026-template-encounter-brief',
+    parentStarterSource: 'starter-2026-notion-hq',
+    title: 'Template - Briefing de Encontro',
+    category: 'HOUSE_RULE',
+    tags: ['starter-pack', 'template', 'encontro', 'gm'],
+    isPublic: false,
+    content: `# Template - Briefing de Encontro
+
+## Cena de abertura
+- Onde a pressao comeca?
+- Qual faccao entra primeiro?
+- Quem corre risco imediato?
+
+## Gatilhos uteis
+- [[Local - Porto de Nevoa Rubra]]
+- [[Local - Biblioteca Silente]]
+- [[Faccao - Corte Cinzenta]]
+- [[Faccao - Culto da Mare Oca]]
+
+## Recursos de resposta rapida
+- [[Quick Rule - Opportunity Attack]]
+- [[Quick Rule - Cover]]
+- [[Potion of Healing]]
+`,
+    blocks: [
+      {
+        blockType: 'TABLE',
+        payload: {
+          columns: ['Batida', 'Escalada', 'Consequencia'],
+          rows: [
+            ['Entrada da cena', 'rumor ou ataque', 'mudanca de objetivo'],
+            ['Ponto medio', 'revelacao ou traicao', 'novo custo'],
+            ['Fecho', 'combate ou pacto', 'gancho da proxima sessao'],
+          ],
+        },
+      },
+      {
+        blockType: 'CHECKLIST',
+        payload: {
+          items: [
+            { text: 'Definir uma recompensa memoravel', checked: false },
+            { text: 'Escolher um custo politico ou emocional', checked: false },
+            { text: 'Registrar qual pagina da wiki sera atualizada depois', checked: false },
+          ],
+        },
+      },
+    ],
   },
 ];
