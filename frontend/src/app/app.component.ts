@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { filter } from 'rxjs/operators';
 import { AuthService } from './core/services/auth.service';
 import { NotificationService } from './core/services/notification.service';
 import { AppIconComponent } from './shared/components/icon.component';
@@ -11,7 +12,7 @@ import { AppIconComponent } from './shared/components/icon.component';
   imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, AppIconComponent],
   template: `
     <div class="app-shell">
-      <nav class="navbar navbar-public" *ngIf="!authService.isAuthenticated">
+      <nav class="navbar navbar-public" *ngIf="!isWorkshopRoute && !authService.isAuthenticated">
         <div class="nav-inner">
           <a routerLink="/" class="nav-brand">
             <app-icon name="sword" class="brand-icon" [size]="24"></app-icon>
@@ -40,7 +41,7 @@ import { AppIconComponent } from './shared/components/icon.component';
         </div>
       </nav>
 
-      <nav class="navbar" *ngIf="authService.isAuthenticated">
+      <nav class="navbar" *ngIf="!isWorkshopRoute && authService.isAuthenticated">
         <div class="nav-inner">
           <a routerLink="/dashboard" class="nav-brand">
             <app-icon name="sword" class="brand-icon" [size]="24"></app-icon>
@@ -86,7 +87,7 @@ import { AppIconComponent } from './shared/components/icon.component';
         </div>
       </nav>
 
-      <main class="page-shell">
+      <main class="page-shell" [class.page-shell-workshop]="isWorkshopRoute">
         <router-outlet></router-outlet>
       </main>
     </div>
@@ -94,6 +95,10 @@ import { AppIconComponent } from './shared/components/icon.component';
   styles: [
     `
       .app-shell {
+        min-height: 100vh;
+      }
+
+      .page-shell-workshop {
         min-height: 100vh;
       }
 
@@ -331,10 +336,20 @@ import { AppIconComponent } from './shared/components/icon.component';
   ],
 })
 export class AppComponent {
+  isWorkshopRoute = false;
+
   constructor(
     public authService: AuthService,
-    public notificationService: NotificationService
+    public notificationService: NotificationService,
+    private readonly router: Router
   ) {
+    this.isWorkshopRoute = this.router.url.startsWith('/workshop');
+    this.router.events
+      .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
+      .subscribe((event) => {
+        this.isWorkshopRoute = event.urlAfterRedirects.startsWith('/workshop');
+      });
+
     this.authService.currentUser$.subscribe((user) => {
       if (user && this.authService.isAuthenticated) {
         this.notificationService.getNotifications().subscribe({

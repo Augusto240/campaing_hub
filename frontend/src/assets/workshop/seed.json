@@ -1,0 +1,212 @@
+{
+  "pages": [
+    {
+      "id": "workshop-home",
+      "title": "Wiki Viva",
+      "parentId": null,
+      "summary": "Mapa editorial da demo: blocos, memoria narrativa e relacoes sem backend.",
+      "tags": ["workshop", "arquitetura", "angular"],
+      "updatedAt": "2026-05-27T18:00:00.000Z",
+      "blocks": [
+        {
+          "id": "home-heading",
+          "type": "heading",
+          "content": "Campaign Hub como laboratorio de conhecimento"
+        },
+        {
+          "id": "home-intro",
+          "type": "paragraph",
+          "content": "Esta rota mostra uma wiki viva frontend-only. O tema RPG e apenas dado narrativo para demonstrar arquitetura."
+        },
+        {
+          "id": "home-callout",
+          "type": "callout",
+          "content": "Golden path: abrir uma sessao, criar um bloco, mencionar uma entidade e ver backlinks, timeline e grafo reagirem."
+        }
+      ]
+    },
+    {
+      "id": "canon-2023",
+      "title": "Canon 2023",
+      "parentId": "workshop-home",
+      "summary": "Legado narrativo preservado como dado de exemplo, nao como escopo de VTT.",
+      "tags": ["legado", "narrativa"],
+      "updatedAt": "2026-05-27T18:05:00.000Z",
+      "blocks": [
+        {
+          "id": "canon-heading",
+          "type": "heading",
+          "content": "Legado como memoria, nao como acoplamento"
+        },
+        {
+          "id": "canon-body",
+          "type": "paragraph",
+          "content": "Augustus Frostborne e Satoru Naitokira continuam como ancora afetiva do projeto, mas a demo trata esses nomes como entidades de conhecimento."
+        }
+      ]
+    },
+    {
+      "id": "augustus",
+      "title": "Augustus Frostborne",
+      "parentId": "canon-2023",
+      "summary": "Mago do legado 2023 usado para demonstrar backlinks e memoria narrativa.",
+      "tags": ["personagem", "legado"],
+      "updatedAt": "2026-05-27T18:10:00.000Z",
+      "blocks": [
+        {
+          "id": "augustus-heading",
+          "type": "heading",
+          "content": "Augustus Frostborne"
+        },
+        {
+          "id": "augustus-body",
+          "type": "paragraph",
+          "content": "Personagem canonico usado para mostrar como uma entidade citada em paginas diferentes vira memoria navegavel."
+        }
+      ]
+    },
+    {
+      "id": "satoru",
+      "title": "Satoru Naitokira",
+      "parentId": "canon-2023",
+      "summary": "Figura noturna do legado autoral usada como relacao semantica inicial.",
+      "tags": ["personagem", "legado"],
+      "updatedAt": "2026-05-27T18:12:00.000Z",
+      "blocks": [
+        {
+          "id": "satoru-heading",
+          "type": "heading",
+          "content": "Satoru Naitokira"
+        },
+        {
+          "id": "satoru-body",
+          "type": "paragraph",
+          "content": "Satoru representa a ideia de lembrancas recorrentes que atravessam paginas, sessoes e pistas."
+        }
+      ]
+    },
+    {
+      "id": "session-01",
+      "title": "Sessao 01 - O arquivo vivo",
+      "parentId": "workshop-home",
+      "summary": "Pagina usada no demo para inserir bloco e criar uma relacao com @Augustus Frostborne.",
+      "tags": ["sessao", "demo"],
+      "updatedAt": "2026-05-27T18:20:00.000Z",
+      "blocks": [
+        {
+          "id": "session-heading",
+          "type": "heading",
+          "content": "Sessao 01 - O arquivo vivo"
+        },
+        {
+          "id": "session-summary",
+          "type": "paragraph",
+          "content": "O grupo encontrou um indice antigo que citava @Satoru Naitokira e sugeria que algumas memorias haviam sido editadas."
+        },
+        {
+          "id": "session-next",
+          "type": "paragraph",
+          "content": ""
+        }
+      ]
+    },
+    {
+      "id": "observatory",
+      "title": "Observatorio das Memorias",
+      "parentId": "workshop-home",
+      "summary": "Local ficticio usado para mostrar que o grafo pode misturar locais, personagens e sessoes.",
+      "tags": ["local", "memoria"],
+      "updatedAt": "2026-05-27T18:25:00.000Z",
+      "blocks": [
+        {
+          "id": "observatory-heading",
+          "type": "heading",
+          "content": "Observatorio das Memorias"
+        },
+        {
+          "id": "observatory-body",
+          "type": "quote",
+          "content": "Toda pagina guarda uma trilha. Toda trilha pode voltar como contexto."
+        }
+      ]
+    }
+  ],
+  "entities": [
+    {
+      "id": "entity-augustus",
+      "name": "Augustus Frostborne",
+      "type": "character",
+      "summary": "Mago do legado usado para demonstrar backlinks.",
+      "pageId": "augustus"
+    },
+    {
+      "id": "entity-satoru",
+      "name": "Satoru Naitokira",
+      "type": "character",
+      "summary": "Figura do legado usada como relacao semantica inicial.",
+      "pageId": "satoru"
+    },
+    {
+      "id": "entity-observatory",
+      "name": "Observatorio das Memorias",
+      "type": "place",
+      "summary": "Local conceitual sobre memoria narrativa.",
+      "pageId": "observatory"
+    },
+    {
+      "id": "entity-memory-index",
+      "name": "Indice Vivo",
+      "type": "concept",
+      "summary": "Objeto conceitual que organiza eventos e relacoes.",
+      "pageId": null
+    }
+  ],
+  "relations": [
+    {
+      "id": "rel-session-satoru",
+      "sourcePageId": "session-01",
+      "targetEntityId": "entity-satoru",
+      "targetPageId": "satoru",
+      "label": "cita",
+      "createdAt": "2026-05-27T18:30:00.000Z",
+      "origin": "seed"
+    },
+    {
+      "id": "rel-canon-augustus",
+      "sourcePageId": "canon-2023",
+      "targetEntityId": "entity-augustus",
+      "targetPageId": "augustus",
+      "label": "ancora",
+      "createdAt": "2026-05-27T18:31:00.000Z",
+      "origin": "seed"
+    },
+    {
+      "id": "rel-home-observatory",
+      "sourcePageId": "workshop-home",
+      "targetEntityId": "entity-observatory",
+      "targetPageId": "observatory",
+      "label": "organiza",
+      "createdAt": "2026-05-27T18:32:00.000Z",
+      "origin": "seed"
+    }
+  ],
+  "timeline": [
+    {
+      "id": "time-workshop-start",
+      "pageId": "workshop-home",
+      "title": "Escopo reposicionado",
+      "description": "Campaign Hub passa a ser apresentado como uma wiki viva com Angular.",
+      "happenedAt": "2026-05-27T18:00:00.000Z",
+      "kind": "seed"
+    },
+    {
+      "id": "time-session-created",
+      "pageId": "session-01",
+      "title": "Sessao conectada ao legado",
+      "description": "A sessao cita Satoru e prepara a criacao de uma nova relacao ao vivo.",
+      "happenedAt": "2026-05-27T18:30:00.000Z",
+      "kind": "seed",
+      "relationId": "rel-session-satoru"
+    }
+  ]
+}

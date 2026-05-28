@@ -12,6 +12,10 @@ export const routes: Routes = [
     loadComponent: () => import('./features/wiki/wiki.component').then(m => m.WikiComponent)
   },
   {
+    path: 'workshop',
+    loadChildren: () => import('./features/workshop/workshop.routes').then(m => m.WORKSHOP_ROUTES)
+  },
+  {
     path: 'dice',
     loadComponent: () => import('./features/dice/dice.component').then(m => m.DiceComponent)
   },
